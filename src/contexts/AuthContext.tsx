@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { supabase } from '../lib/supabase';
 import { DatabaseService } from '../lib/database';
-import { isUsingMockClient } from '../lib/supabase';
 import type { User, UserRole } from '../types/database';
 import toast from 'react-hot-toast';
 
@@ -14,12 +14,6 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-// Demo users for testing
-const DEMO_USERS = {
-  'admin@company.com': { role: 'ADMIN' as UserRole, password: 'admin123' },
-  'hr@company.com': { role: 'HR' as UserRole, password: 'admin123' },
-};
-
 interface AuthProviderProps {
   children: React.ReactNode;
 }
@@ -31,116 +25,102 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   useEffect(() => {
     // Check for existing session
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      try {
-        const userData = JSON.parse(storedUser);
-        setUser(userData);
-        setRole(userData.role);
-      } catch (error) {
-        console.error('Error parsing stored user:', error);
-        localStorage.removeItem('user');
-      }
-    }
-    setLoading(false);
+    checkSession();
   }, []);
+
+  const checkSession = async () => {
+    try {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      
+      if (error) {
+        console.error('Error checking session:', error);
+        setLoading(false);
+        return;
+      }
+
+      if (session?.user) {
+        // Get user details from database
+        const dbUser = await DatabaseService.getUserByEmail(session.user.email!);
+        if (dbUser) {
+          setUser(dbUser);
+          setRole(dbUser.role);
+        }
+      }
+    } catch (error) {
+      console.error('Error in checkSession:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
       console.log('Login attempt for:', email);
-      console.log('Using mock client:', isUsingMockClient);
       
-      // Check demo users first
-      const demoUser = DEMO_USERS[email as keyof typeof DEMO_USERS];
-      if (demoUser && demoUser.password === password) {
-        console.log('Demo user login successful');
-        // Create simulated user object for demo users
-        const simulatedUser: User = {
-          id: `demo-${demoUser.role.toLowerCase()}`,
-          username: email.split('@')[0],
-          email: email,
-          phone: '0123456789',
-          full_name: demoUser.role === 'ADMIN' ? 'Admin Demo' : 'HR Demo',
-          role: demoUser.role,
-          status: 'ACTIVE',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        };
+      // First, try to authenticate with Supabase Auth
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        console.error('Supabase auth error:', error);
+        toast.error('Email hoặc mật khẩu không chính xác');
+        return false;
+      }
+
+      if (data.user) {
+        // Get user details from database
+        const dbUser = await DatabaseService.getUserByEmail(email);
         
-        setUser(simulatedUser);
-        setRole(simulatedUser.role);
-        localStorage.setItem('user', JSON.stringify(simulatedUser));
+        if (!dbUser) {
+          console.error('User not found in database');
+          toast.error('Tài khoản không tồn tại trong hệ thống');
+          await supabase.auth.signOut();
+          return false;
+        }
+
+        if (dbUser.status !== 'ACTIVE') {
+          console.error('User account is disabled');
+          toast.error('Tài khoản đã bị vô hiệu hóa');
+          await supabase.auth.signOut();
+          return false;
+        }
+
+        console.log('Login successful for user:', dbUser.full_name);
+        setUser(dbUser);
+        setRole(dbUser.role);
         
-        console.log('Demo user authenticated');
+        // Create audit log
+        try {
+          await DatabaseService.createAuditLog({
+            actor_id: dbUser.id,
+            action: 'LOGIN',
+            target_type: 'USER',
+            target_id: dbUser.id,
+          });
+        } catch (auditError) {
+          console.warn('Failed to create login audit log:', auditError);
+        }
         
-        toast.success(`Chào mừng ${simulatedUser.full_name}!`);
+        toast.success(`Chào mừng ${dbUser.full_name}!`);
         return true;
       }
 
-      // For non-demo users, try database connection
-      if (!isUsingMockClient) {
-        try {
-          console.log('Checking database for user:', email);
-          const dbUser = await DatabaseService.getUserByEmail(email);
-          console.log('Database user found:', !!dbUser);
-          
-          if (dbUser && dbUser.status === 'ACTIVE') {
-            // In production, you would verify the password hash here
-            // For now, we'll check if password matches the stored hash or is a default password
-            const isValidPassword = dbUser.password_hash === password || 
-                                   password === 'admin123' || 
-                                   password === 'password123';
-            
-            if (!isValidPassword) {
-              console.log('Invalid password for user:', email);
-              toast.error('Mật khẩu không chính xác');
-              return false;
-            }
-
-            console.log('Database user login successful');
-            setUser(dbUser);
-            setRole(dbUser.role);
-            localStorage.setItem('user', JSON.stringify(dbUser));
-            
-            try {
-              await DatabaseService.createAuditLog({
-                actor_id: dbUser.id,
-                action: 'LOGIN',
-                target_type: 'USER',
-                target_id: dbUser.id,
-              });
-            } catch (auditError) {
-              console.warn('Failed to create audit log:', auditError);
-            }
-            
-            toast.success(`Chào mừng ${dbUser.full_name}!`);
-            return true;
-          }
-        } catch (dbError) {
-          console.warn('Database login failed:', dbError);
-          if (dbError instanceof Error && dbError.message === 'NETWORK_ERROR') {
-            toast.error('Không thể kết nối database. Vui lòng sử dụng tài khoản demo: admin@company.com / admin123');
-          } else {
-            toast.error('Lỗi database. Vui lòng sử dụng tài khoản demo: admin@company.com / admin123');
-          }
-        }
-      } else {
-        console.log('Mock client active - only demo users available');
-        toast.error('Chỉ có thể sử dụng tài khoản demo: admin@company.com / admin123');
-      }
-
-      console.log('Login failed for:', email);
-      toast.error('Email hoặc mật khẩu không chính xác');
       return false;
     } catch (error) {
       console.error('Login error:', error);
       
       let errorMessage = 'Đã xảy ra lỗi khi đăng nhập';
       if (error instanceof Error) {
-        if (error.message.includes('fetch') || error.message.includes('network')) {
-          errorMessage = 'Lỗi kết nối. Vui lòng sử dụng tài khoản demo: admin@company.com / admin123';
-        } else if (error.message.includes('42501') || error.message.includes('row-level security')) {
-          errorMessage = 'Lỗi bảo mật. Vui lòng sử dụng tài khoản demo: admin@company.com / admin123';
+        if (error.message.includes('Invalid login credentials')) {
+          errorMessage = 'Email hoặc mật khẩu không chính xác';
+        } else if (error.message.includes('Email not confirmed')) {
+          errorMessage = 'Vui lòng xác nhận email trước khi đăng nhập';
+        } else if (error.message.includes('Too many requests')) {
+          errorMessage = 'Quá nhiều lần thử. Vui lòng thử lại sau';
+        } else if (error.message.includes('fetch') || error.message.includes('network')) {
+          errorMessage = 'Lỗi kết nối. Vui lòng kiểm tra internet và thử lại';
         } else {
           errorMessage = error.message;
         }
@@ -152,23 +132,31 @@ export function AuthProvider({ children }: AuthProviderProps) {
   };
 
   const logout = async () => {
-    if (user) {
-      try {
-        await DatabaseService.createAuditLog({
-          actor_id: user.id,
-          action: 'LOGOUT',
-          target_type: 'USER',
-          target_id: user.id,
-        });
-      } catch (auditError) {
-        console.warn('Failed to create logout audit log:', auditError);
+    try {
+      if (user) {
+        // Create logout audit log
+        try {
+          await DatabaseService.createAuditLog({
+            actor_id: user.id,
+            action: 'LOGOUT',
+            target_type: 'USER',
+            target_id: user.id,
+          });
+        } catch (auditError) {
+          console.warn('Failed to create logout audit log:', auditError);
+        }
       }
+      
+      // Sign out from Supabase
+      await supabase.auth.signOut();
+      
+      setUser(null);
+      setRole(null);
+      toast.success('Đăng xuất thành công');
+    } catch (error) {
+      console.error('Logout error:', error);
+      toast.error('Có lỗi xảy ra khi đăng xuất');
     }
-    
-    setUser(null);
-    setRole(null);
-    localStorage.removeItem('user');
-    toast.success('Đăng xuất thành công');
   };
 
   return (

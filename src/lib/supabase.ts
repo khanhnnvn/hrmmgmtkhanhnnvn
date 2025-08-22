@@ -4,124 +4,53 @@ import type { Database } from '../types/database';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-// Only log in development mode
-if (import.meta.env.DEV) {
-  console.log('Supabase configuration check:');
-  console.log('URL:', supabaseUrl);
-  console.log('Anon Key present:', !!supabaseAnonKey);
+// Validate Supabase configuration
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error(
+    'Missing Supabase configuration. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file'
+  );
 }
 
-// Create a mock client for development when Supabase is not configured
-const createMockClient = () => {
-  if (import.meta.env.DEV) {
-    console.warn('Creating mock Supabase client - database operations will be simulated');
-  }
-  
-  return {
-    from: (table: string) => ({
-      select: (columns?: string) => ({
-        eq: () => ({ 
-          select: () => Promise.resolve({ data: [], error: null }),
-          single: () => Promise.resolve({ data: null, error: null }),
-          order: () => Promise.resolve({ data: [], error: null })
-        }),
-        single: () => Promise.resolve({ data: null, error: null }),
-        order: () => Promise.resolve({ data: [], error: null }),
-        then: (resolve: any) => resolve({ data: [], error: null })
-      }),
-      insert: (data: any) => ({
-        select: () => ({
-          single: () => Promise.resolve({ data: null, error: null }),
-          then: (resolve: any) => resolve({ data: null, error: null })
-        }),
-        then: (resolve: any) => resolve({ data: null, error: null })
-      }),
-      update: (data: any) => ({
-        eq: () => ({
-          select: () => ({
-            single: () => Promise.resolve({ data: null, error: null }),
-            then: (resolve: any) => resolve({ data: null, error: null })
-          }),
-          then: (resolve: any) => resolve({ data: null, error: null })
-        }),
-        then: (resolve: any) => resolve({ data: null, error: null })
-      }),
-      delete: () => ({
-        eq: () => Promise.resolve({ data: null, error: null }),
-        then: (resolve: any) => resolve({ data: null, error: null })
-      }),
-      eq: () => ({ 
-        select: () => Promise.resolve({ data: [], error: null }),
-        single: () => Promise.resolve({ data: null, error: null }),
-        update: () => Promise.resolve({ data: null, error: null }),
-        delete: () => Promise.resolve({ data: null, error: null })
-      }),
-      single: () => Promise.resolve({ data: null, error: null })
-    }),
-    auth: {
-      getSession: () => Promise.resolve({ data: { session: null }, error: null }),
-      signInWithPassword: () => Promise.resolve({ 
-        data: null, 
-        error: { message: 'Mock auth - sử dụng tài khoản demo: admin@company.com / admin123' } 
-      }),
-      signOut: () => Promise.resolve({ error: null })
-    }
-  } as any;
-};
-
-// Check if Supabase is properly configured
-const isSupabaseConfigured = supabaseUrl && 
-  supabaseAnonKey && 
-  supabaseUrl !== 'YOUR_SUPABASE_URL' && 
-  supabaseUrl !== 'https://your-project-id.supabase.co' &&
-  supabaseAnonKey !== 'YOUR_SUPABASE_ANON_KEY';
-
-let supabase: any;
-
-if (isSupabaseConfigured) {
-  try {
-    if (import.meta.env.DEV) {
-      console.log('Initializing Supabase client with real credentials...');
-    }
-    supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-        detectSessionInUrl: false,
-        flowType: 'implicit'
-      },
-      db: {
-        schema: 'public'
-      },
-      global: {
-        headers: {
-          'X-Client-Info': 'recruitment-system',
-          'apikey': supabaseAnonKey,
-          'Authorization': `Bearer ${supabaseAnonKey}`,
-          'Content-Type': 'application/json',
-          'Prefer': 'return=minimal'
-        }
-      },
-      realtime: {
-        params: {
-          eventsPerSecond: 10
-        }
-      }
-    });
-    if (import.meta.env.DEV) {
-      console.log('Supabase client initialized successfully');
-    }
-  } catch (error) {
-    console.error('Failed to initialize Supabase client:', error);
-    supabase = createMockClient();
-  }
-} else {
-  if (import.meta.env.DEV) {
-    console.warn('Supabase not configured properly, using mock client');
-    console.warn('To use real database, please configure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env file');
-  }
-  supabase = createMockClient();
+if (supabaseUrl === 'YOUR_SUPABASE_URL' || supabaseAnonKey === 'YOUR_SUPABASE_ANON_KEY') {
+  throw new Error(
+    'Please replace placeholder values in .env file with your actual Supabase project credentials'
+  );
 }
 
-export { supabase };
-export const isUsingMockClient = !isSupabaseConfigured;
+// Create Supabase client
+export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: false,
+    flowType: 'implicit'
+  },
+  db: {
+    schema: 'public'
+  },
+  global: {
+    headers: {
+      'X-Client-Info': 'recruitment-system@1.0.0',
+    }
+  },
+  realtime: {
+    params: {
+      eventsPerSecond: 10
+    }
+  }
+});
+
+// Test connection on initialization
+supabase.from('users').select('count', { count: 'exact', head: true })
+  .then(({ error }) => {
+    if (error) {
+      console.error('Supabase connection test failed:', error.message);
+    } else {
+      console.log('✅ Supabase connection established successfully');
+    }
+  })
+  .catch((error) => {
+    console.error('❌ Failed to connect to Supabase:', error.message);
+  });
+
+export const isUsingMockClient = false;
