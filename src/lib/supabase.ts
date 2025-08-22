@@ -49,19 +49,6 @@ if (!supabaseUrl || !supabaseAnonKey) {
   });
   
   isUsingMockClient = false;
-  
-  // Test connection on initialization
-  supabase.from('users').select('count', { count: 'exact', head: true })
-    .then(({ error }) => {
-      if (error) {
-        console.error('Supabase connection test failed:', error.message);
-      } else {
-        console.log('✅ Supabase connection established successfully');
-      }
-    })
-    .catch((error) => {
-      console.error('❌ Failed to connect to Supabase:', error.message);
-    });
 }
 
 export { supabase, isUsingMockClient };
