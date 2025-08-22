@@ -103,6 +103,13 @@ export function LoginForm() {
                 <strong>HR:</strong> hr@company.com / admin123
               </div>
             </div>
+            <button
+              type="button"
+              onClick={createDemoUsers}
+              className="mt-3 w-full bg-green-600 text-white py-2 px-4 rounded-lg text-sm font-medium hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors"
+            >
+              Tạo tài khoản demo
+            </button>
           </div>
         </div>
       </div>
