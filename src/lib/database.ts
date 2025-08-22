@@ -43,9 +43,36 @@ export class DatabaseService {
     try {
       console.log('Creating user with data:', userData);
       
+      // First, create the user in Supabase Auth if password is provided
+      let authUserId = userData.id;
+      
+      if (userData.password_hash && userData.email) {
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+          email: userData.email,
+          password: userData.password_hash,
+        });
+
+        if (authError) {
+          console.error('Auth signup error:', authError);
+          throw new Error(`Lỗi tạo tài khoản xác thực: ${authError.message}`);
+        }
+
+        if (authData.user) {
+          authUserId = authData.user.id;
+          console.log('Auth user created with ID:', authUserId);
+        }
+      }
+
+      // Prepare user data for database insertion
+      const dbUserData = {
+        ...userData,
+        id: authUserId,
+        password_hash: undefined // Don't store password hash in database
+      };
+
       const { data, error } = await supabase
         .from('users')
-        .insert(userData)
+        .insert(dbUserData)
         .select()
         .single();
 
