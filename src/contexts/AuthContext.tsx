@@ -48,7 +48,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
       console.log('Login attempt for:', email);
-      console.log('Supabase client status:', supabase.supabaseUrl);
+      console.log('Supabase URL configured:', import.meta.env.VITE_SUPABASE_URL);
       
       // Check demo users first
       const demoUser = DEMO_USERS[email as keyof typeof DEMO_USERS];
@@ -71,55 +71,56 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setRole(simulatedUser.role);
         localStorage.setItem('user', JSON.stringify(simulatedUser));
         
-        // Set auth session for demo users to enable RLS policies
-        try {
-          await supabase.auth.signInAnonymously();
-          console.log('Anonymous session created for demo user');
-        } catch (authError) {
-          console.warn('Could not create anonymous session:', authError);
-        }
+        // Skip Supabase auth for demo users to avoid connection errors
+        console.log('Demo user authenticated without Supabase connection');
         
         toast.success(`Chào mừng ${simulatedUser.full_name}!`);
         return true;
       }
 
-      // If not demo user, check database
-      console.log('Checking database for user:', email);
-      const dbUser = await DatabaseService.getUserByEmail(email);
-      console.log('Database user found:', !!dbUser);
-      
-      if (dbUser && dbUser.status === 'ACTIVE') {
-        // In production, you would verify the password hash here
-        // For now, we'll check if password matches the stored hash or is a default password
-        const isValidPassword = dbUser.password_hash === password || 
-                               password === 'admin123' || 
-                               password === 'password123';
+      // For non-demo users, try database connection with fallback
+      try {
+        console.log('Checking database for user:', email);
+        const dbUser = await DatabaseService.getUserByEmail(email);
+        console.log('Database user found:', !!dbUser);
         
-        if (!isValidPassword) {
-          console.log('Invalid password for user:', email);
-          toast.error('Mật khẩu không chính xác');
-          return false;
-        }
+        if (dbUser && dbUser.status === 'ACTIVE') {
+          // In production, you would verify the password hash here
+          // For now, we'll check if password matches the stored hash or is a default password
+          const isValidPassword = dbUser.password_hash === password || 
+                                 password === 'admin123' || 
+                                 password === 'password123';
+          
+          if (!isValidPassword) {
+            console.log('Invalid password for user:', email);
+            toast.error('Mật khẩu không chính xác');
+            return false;
+          }
 
-        console.log('Database user login successful');
-        setUser(dbUser);
-        setRole(dbUser.role);
-        localStorage.setItem('user', JSON.stringify(dbUser));
-        
-        try {
-          await DatabaseService.createAuditLog({
-            actor_id: dbUser.id,
-            action: 'LOGIN',
-            target_type: 'USER',
-            target_id: dbUser.id,
-          });
-        } catch (auditError) {
-          console.warn('Failed to create audit log:', auditError);
-          // Don't fail login if audit log fails
+          console.log('Database user login successful');
+          setUser(dbUser);
+          setRole(dbUser.role);
+          localStorage.setItem('user', JSON.stringify(dbUser));
+          
+          try {
+            await DatabaseService.createAuditLog({
+              actor_id: dbUser.id,
+              action: 'LOGIN',
+              target_type: 'USER',
+              target_id: dbUser.id,
+            });
+          } catch (auditError) {
+            console.warn('Failed to create audit log:', auditError);
+            // Don't fail login if audit log fails
+          }
+          
+          toast.success(`Chào mừng ${dbUser.full_name}!`);
+          return true;
         }
-        
-        toast.success(`Chào mừng ${dbUser.full_name}!`);
-        return true;
+      } catch (dbError) {
+        console.warn('Database connection failed, falling back to demo mode:', dbError);
+        toast.error('Không thể kết nối cơ sở dữ liệu. Vui lòng kiểm tra kết nối Supabase hoặc sử dụng tài khoản demo.');
+        return false;
       }
 
       console.log('Login failed for:', email);
@@ -130,8 +131,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
       
       let errorMessage = 'Đã xảy ra lỗi khi đăng nhập';
       if (error instanceof Error) {
-        if (error.message.includes('network') || error.message.includes('fetch')) {
-          errorMessage = 'Lỗi kết nối. Vui lòng kiểm tra internet và thử lại.';
+        if (error.message.includes('network') || error.message.includes('fetch') || error.message.includes('Failed to fetch')) {
+          errorMessage = 'Lỗi kết nối Supabase. Vui lòng kiểm tra cấu hình .env hoặc sử dụng tài khoản demo (admin@company.com / admin123).';
         } else if (error.message.includes('42501') || error.message.includes('row-level security')) {
           errorMessage = 'Lỗi bảo mật hệ thống. Vui lòng liên hệ quản trị viên.';
         }
