@@ -57,6 +57,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       console.log('Login attempt for:', email);
       
+      // Check if Supabase is properly configured
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      
+      if (!supabaseUrl || !supabaseAnonKey || 
+          supabaseUrl === 'YOUR_SUPABASE_URL' || 
+          supabaseAnonKey === 'YOUR_SUPABASE_ANON_KEY' ||
+          supabaseUrl === 'https://placeholder.supabase.co') {
+        console.error('Supabase not configured properly');
+        toast.error('Hệ thống chưa được cấu hình. Vui lòng liên hệ quản trị viên.');
+        return false;
+      }
+      
       // First, try to authenticate with Supabase Auth
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -65,7 +78,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       if (error) {
         console.error('Supabase auth error:', error);
-        toast.error('Email hoặc mật khẩu không chính xác');
+        
+        // Handle specific error types
+        if (error.message.includes('Failed to fetch') || error.message.includes('fetch')) {
+          toast.error('Không thể kết nối đến server. Vui lòng kiểm tra kết nối mạng và thử lại.');
+        } else if (error.message.includes('Invalid login credentials')) {
+          toast.error('Email hoặc mật khẩu không chính xác');
+        } else if (error.message.includes('Email not confirmed')) {
+          toast.error('Vui lòng xác nhận email trước khi đăng nhập');
+        } else {
+          toast.error('Lỗi đăng nhập: ' + error.message);
+        }
         return false;
       }
 
@@ -113,14 +136,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
       
       let errorMessage = 'Đã xảy ra lỗi khi đăng nhập';
       if (error instanceof Error) {
-        if (error.message.includes('Invalid login credentials')) {
+        if (error.message.includes('Failed to fetch') || error.message.includes('fetch')) {
+          errorMessage = 'Không thể kết nối đến server. Vui lòng kiểm tra cấu hình Supabase và kết nối mạng.';
+        } else if (error.message.includes('Invalid login credentials')) {
           errorMessage = 'Email hoặc mật khẩu không chính xác';
         } else if (error.message.includes('Email not confirmed')) {
           errorMessage = 'Vui lòng xác nhận email trước khi đăng nhập';
         } else if (error.message.includes('Too many requests')) {
           errorMessage = 'Quá nhiều lần thử. Vui lòng thử lại sau';
-        } else if (error.message.includes('fetch') || error.message.includes('network')) {
-          errorMessage = 'Lỗi kết nối. Vui lòng kiểm tra internet và thử lại';
         } else {
           errorMessage = error.message;
         }
