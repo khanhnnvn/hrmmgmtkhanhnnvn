@@ -30,6 +30,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const checkSession = async () => {
     try {
+      console.log('🔍 Checking existing session...');
       const { data: { session }, error } = await supabase.auth.getSession();
       
       if (error) {
@@ -39,12 +40,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
 
       if (session?.user) {
+        console.log('📧 Found session for user:', session.user.email);
         // Get user details from database
         const dbUser = await DatabaseService.getUserByEmail(session.user.email!);
         if (dbUser) {
+          console.log('✅ User found in database:', dbUser.full_name);
           setUser(dbUser);
           setRole(dbUser.role);
+        } else {
+          console.warn('⚠️ User not found in database, signing out');
+          await supabase.auth.signOut();
         }
+      } else {
+        console.log('ℹ️ No active session found');
       }
     } catch (error) {
       console.error('Error in checkSession:', error);

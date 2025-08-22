@@ -143,6 +143,7 @@ export class DatabaseService {
 
   static async getUserByEmail(email: string): Promise<User | null> {
     try {
+      console.log('🔍 Looking for user with email:', email);
       const { data, error } = await supabase
         .from('users')
         .select('*')
@@ -151,7 +152,14 @@ export class DatabaseService {
         .single();
 
       if (error && error.code !== 'PGRST116') {
+        console.error('Database error finding user:', error);
         this.handleDatabaseError(error, 'tìm người dùng');
+      }
+      
+      if (data) {
+        console.log('✅ User found:', data.full_name, '- Role:', data.role);
+      } else {
+        console.log('❌ No user found with email:', email);
       }
       
       return data;
