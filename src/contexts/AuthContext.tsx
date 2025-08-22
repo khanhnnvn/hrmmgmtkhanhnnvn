@@ -22,12 +22,37 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
   const [role, setRole] = useState<UserRole | null>(null);
   const [loading, setLoading] = useState(true);
+  const [adminSetupComplete, setAdminSetupComplete] = useState(false);
 
   useEffect(() => {
-    // Check for existing session
-    checkSession();
+    // Setup admin user and check session
+    initializeApp();
   }, []);
 
+  const initializeApp = async () => {
+    try {
+      console.log('🚀 Initializing application...');
+      
+      // First, ensure admin user exists
+      const adminExists = await DatabaseService.checkAdminExists();
+      if (!adminExists) {
+        console.log('👤 Creating admin user...');
+        await DatabaseService.createAdminUser();
+        console.log('✅ Admin user created successfully');
+      } else {
+        console.log('✅ Admin user already exists');
+      }
+      
+      setAdminSetupComplete(true);
+      
+      // Then check for existing session
+      await checkSession();
+    } catch (error) {
+      console.error('Error initializing app:', error);
+      setAdminSetupComplete(true);
+      setLoading(false);
+    }
+  };
   const checkSession = async () => {
     try {
       console.log('🔍 Checking existing session...');
@@ -145,7 +170,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, role, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, role, loading: loading || !adminSetupComplete, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
