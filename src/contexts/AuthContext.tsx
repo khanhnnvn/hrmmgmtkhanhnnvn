@@ -33,12 +33,35 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       console.log('🚀 Initializing application...');
       
-      // First, ensure admin user exists
+      // Check Supabase configuration first
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      
+      if (!supabaseUrl || !supabaseAnonKey || 
+          supabaseUrl === 'YOUR_SUPABASE_URL' || 
+          supabaseAnonKey === 'YOUR_SUPABASE_ANON_KEY' ||
+          supabaseUrl === 'https://placeholder.supabase.co') {
+        console.error('❌ Supabase not configured properly');
+        toast.error('Hệ thống chưa được cấu hình Supabase. Vui lòng kết nối với Supabase.');
+        setAdminSetupComplete(true);
+        setLoading(false);
+        return;
+      }
+      
+      console.log('✅ Supabase configuration found');
+      
+      // Ensure admin user exists
       const adminExists = await DatabaseService.checkAdminExists();
       if (!adminExists) {
         console.log('👤 Creating admin user...');
-        await DatabaseService.createAdminUser();
-        console.log('✅ Admin user created successfully');
+        try {
+          await DatabaseService.createAdminUser();
+          console.log('✅ Admin user created successfully');
+          toast.success('Tài khoản admin đã được tạo: admin@company.com / admin123');
+        } catch (error) {
+          console.error('❌ Failed to create admin user:', error);
+          toast.error('Không thể tạo tài khoản admin. Vui lòng kiểm tra cấu hình Supabase.');
+        }
       } else {
         console.log('✅ Admin user already exists');
       }
@@ -49,6 +72,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       await checkSession();
     } catch (error) {
       console.error('Error initializing app:', error);
+      toast.error('Lỗi khởi tạo ứng dụng. Vui lòng tải lại trang.');
       setAdminSetupComplete(true);
       setLoading(false);
     }

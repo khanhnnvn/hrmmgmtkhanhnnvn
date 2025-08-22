@@ -21,7 +21,9 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: false,
-    flowType: 'implicit'
+    flowType: 'implicit',
+    // Disable email confirmation for development
+    confirmationUrl: undefined
   },
   db: {
     schema: 'public'
@@ -37,6 +39,18 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
     }
   }
 });
+
+// Helper function to check if email confirmation is disabled
+export const checkEmailConfirmationStatus = async () => {
+  try {
+    const { data, error } = await supabase.auth.getSession();
+    console.log('Current auth session:', data?.session ? 'Active' : 'None');
+    return !error;
+  } catch (error) {
+    console.error('Error checking email confirmation status:', error);
+    return false;
+  }
+};
 
 // Test connection
 supabase.auth.getSession().then(({ data, error }) => {

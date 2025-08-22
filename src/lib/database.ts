@@ -102,15 +102,43 @@ export class DatabaseService {
         status: 'ACTIVE' as const
       };
 
-      // Create user in Supabase Auth
+      // Create user in Supabase Auth with email confirmation disabled
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: adminData.email,
         password: adminData.password,
+        options: {
+          emailRedirectTo: undefined,
+          data: {
+            full_name: adminData.full_name,
+            role: adminData.role
+          }
+        }
       });
 
       if (authError) {
         console.error('Auth signup error:', authError);
-        throw new Error(`Lỗi tạo tài khoản admin: ${authError.message}`);
+        
+        // If user already exists in auth, that's okay
+        if (authError.message.includes('User already registered')) {
+          console.log('Admin user already exists in Supabase Auth');
+          
+          // Try to get the existing user
+          const { data: existingUsers, error: listError } = await supabase.auth.admin.listUsers();
+          if (listError) {
+            console.error('Error listing users:', listError);
+            throw new Error(`Lỗi kiểm tra tài khoản admin: ${listError.message}`);
+          }
+          
+          const existingUser = existingUsers.users.find(u => u.email === adminData.email);
+          if (existingUser) {
+            console.log('Found existing admin user in auth:', existingUser.id);
+            authData.user = existingUser;
+          } else {
+            throw new Error('Không thể tìm thấy tài khoản admin đã tồn tại');
+          }
+        } else {
+          throw new Error(`Lỗi tạo tài khoản admin: ${authError.message}`);
+        }
       }
 
       if (!authData.user) {
@@ -119,7 +147,23 @@ export class DatabaseService {
 
       console.log('Admin auth user created with ID:', authData.user.id);
 
-      // Create user record in database
+      // Check if user already exists in database
+      const { data: existingDbUser, error: checkError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', authData.user.id)
+        .single();
+
+      if (checkError && checkError.code !== 'PGRST116') {
+        console.error('Error checking existing user:', checkError);
+      }
+
+      if (existingDbUser) {
+        console.log('Admin user already exists in database:', existingDbUser.full_name);
+        return existingDbUser;
+      }
+
+      // Create user record in database if it doesn't exist
       const { data: dbUser, error: dbError } = await supabase
         .from('users')
         .insert({
@@ -136,13 +180,24 @@ export class DatabaseService {
 
       if (dbError) {
         console.error('Database insert error:', dbError);
-        // If database insert fails, clean up auth user
-        try {
-          await supabase.auth.admin.deleteUser(authData.user.id);
-        } catch (cleanupError) {
-          console.error('Failed to cleanup auth user:', cleanupError);
+        
+        // If user already exists in database, that's okay
+        if (dbError.code === '23505') {
+          console.log('Admin user already exists in database, fetching...');
+          const { data: existingUser, error: fetchError } = await supabase
+            .from('users')
+            .select('*')
+            .eq('email', adminData.email)
+            .single();
+            
+          if (fetchError) {
+            this.handleDatabaseError(fetchError, 'tải tài khoản admin');
+          }
+          
+          return existingUser;
+        } else {
+          this.handleDatabaseError(dbError, 'tạo bản ghi admin');
         }
-        this.handleDatabaseError(dbError, 'tạo bản ghi admin');
       }
 
       console.log('Admin user created successfully:', dbUser);
