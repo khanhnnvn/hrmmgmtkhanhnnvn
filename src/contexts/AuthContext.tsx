@@ -79,41 +79,50 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       // For non-demo users, try database connection
       if (!isUsingMockClient) {
-        console.log('Checking database for user:', email);
-        const dbUser = await DatabaseService.getUserByEmail(email);
-        console.log('Database user found:', !!dbUser);
-        
-        if (dbUser && dbUser.status === 'ACTIVE') {
-          // In production, you would verify the password hash here
-          // For now, we'll check if password matches the stored hash or is a default password
-          const isValidPassword = dbUser.password_hash === password || 
-                                 password === 'admin123' || 
-                                 password === 'password123';
+        try {
+          console.log('Checking database for user:', email);
+          const dbUser = await DatabaseService.getUserByEmail(email);
+          console.log('Database user found:', !!dbUser);
           
-          if (!isValidPassword) {
-            console.log('Invalid password for user:', email);
-            toast.error('Mật khẩu không chính xác');
-            return false;
-          }
+          if (dbUser && dbUser.status === 'ACTIVE') {
+            // In production, you would verify the password hash here
+            // For now, we'll check if password matches the stored hash or is a default password
+            const isValidPassword = dbUser.password_hash === password || 
+                                   password === 'admin123' || 
+                                   password === 'password123';
+            
+            if (!isValidPassword) {
+              console.log('Invalid password for user:', email);
+              toast.error('Mật khẩu không chính xác');
+              return false;
+            }
 
-          console.log('Database user login successful');
-          setUser(dbUser);
-          setRole(dbUser.role);
-          localStorage.setItem('user', JSON.stringify(dbUser));
-          
-          await DatabaseService.createAuditLog({
-            actor_id: dbUser.id,
-            action: 'LOGIN',
-            target_type: 'USER',
-            target_id: dbUser.id,
-          });
-          
-          toast.success(`Chào mừng ${dbUser.full_name}!`);
-          return true;
+            console.log('Database user login successful');
+            setUser(dbUser);
+            setRole(dbUser.role);
+            localStorage.setItem('user', JSON.stringify(dbUser));
+            
+            try {
+              await DatabaseService.createAuditLog({
+                actor_id: dbUser.id,
+                action: 'LOGIN',
+                target_type: 'USER',
+                target_id: dbUser.id,
+              });
+            } catch (auditError) {
+              console.warn('Failed to create audit log:', auditError);
+            }
+            
+            toast.success(`Chào mừng ${dbUser.full_name}!`);
+            return true;
+          }
+        } catch (dbError) {
+          console.warn('Database login failed, falling back to demo mode:', dbError);
+          toast.error('Lỗi kết nối database. Vui lòng sử dụng tài khoản demo.');
         }
       } else {
         console.log('Mock client active - only demo users available');
-        toast.error('Chỉ có thể sử dụng tài khoản demo. Vui lòng cấu hình Supabase để sử dụng tài khoản thực.');
+        toast.error('Chỉ có thể sử dụng tài khoản demo: admin@company.com / admin123');
       }
 
       console.log('Login failed for:', email);
@@ -124,10 +133,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
       
       let errorMessage = 'Đã xảy ra lỗi khi đăng nhập';
       if (error instanceof Error) {
-        if (error.message.includes('42501') || error.message.includes('row-level security')) {
-          errorMessage = 'Lỗi bảo mật hệ thống. Vui lòng liên hệ quản trị viên.';
-        } else if (error.message.includes('network') || error.message.includes('fetch')) {
-          errorMessage = 'Lỗi kết nối. Vui lòng sử dụng tài khoản demo (admin@company.com / admin123).';
+        if (error.message.includes('fetch') || error.message.includes('network')) {
+          errorMessage = 'Lỗi kết nối. Vui lòng sử dụng tài khoản demo: admin@company.com / admin123';
+        } else if (error.message.includes('42501') || error.message.includes('row-level security')) {
+          errorMessage = 'Lỗi bảo mật. Vui lòng sử dụng tài khoản demo: admin@company.com / admin123';
+        } else {
+          errorMessage = error.message;
         }
       }
       
@@ -138,12 +149,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const logout = async () => {
     if (user) {
-      await DatabaseService.createAuditLog({
-        actor_id: user.id,
-        action: 'LOGOUT',
-        target_type: 'USER',
-        target_id: user.id,
-      });
+      try {
+        await DatabaseService.createAuditLog({
+          actor_id: user.id,
+          action: 'LOGOUT',
+          target_type: 'USER',
+          target_id: user.id,
+        });
+      } catch (auditError) {
+        console.warn('Failed to create logout audit log:', auditError);
+      }
     }
     
     setUser(null);

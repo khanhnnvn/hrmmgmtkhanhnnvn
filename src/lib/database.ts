@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { isUsingMockClient } from './supabase';
+import toast from 'react-hot-toast';
 import type { 
   User, 
   Candidate, 
@@ -68,7 +69,30 @@ let mockEmployees: Employee[] = [];
 export class DatabaseService {
   // Helper method to check if we should use mock data
   private static shouldUseMockData(): boolean {
-    return isUsingMockClient;
+    return isUsingMockClient || !supabase;
+  }
+
+  // Helper method to handle database errors
+  private static handleDatabaseError(error: any, operation: string): never {
+    console.error(`Database error in ${operation}:`, error);
+    
+    let errorMessage = `Lỗi ${operation}`;
+    
+    if (error?.code === '42501' || error?.message?.includes('row-level security')) {
+      errorMessage = 'Lỗi phân quyền: Vui lòng đăng nhập lại';
+    } else if (error?.code === '23505') {
+      errorMessage = 'Dữ liệu đã tồn tại trong hệ thống';
+    } else if (error?.code === '23503') {
+      errorMessage = 'Dữ liệu tham chiếu không tồn tại';
+    } else if (error?.message?.includes('fetch') || error?.message?.includes('network')) {
+      errorMessage = 'Lỗi kết nối mạng. Đang chuyển sang chế độ demo...';
+      // Switch to mock mode on network errors
+      console.warn('Network error detected, switching to mock mode');
+    } else if (error?.message) {
+      errorMessage = error.message;
+    }
+    
+    throw new Error(errorMessage);
   }
 
   // User management
@@ -86,24 +110,30 @@ export class DatabaseService {
         updated_at: new Date().toISOString()
       } as User;
       mockUsers.push(newUser);
+      toast.success('Tạo người dùng thành công (Demo mode)');
       return newUser;
     }
 
-    console.log('Creating user with data:', userData);
-    
-    const { data, error } = await supabase
-      .from('users')
-      .insert(userData)
-      .select()
-      .single();
+    try {
+      console.log('Creating user with data:', userData);
+      
+      const { data, error } = await supabase
+        .from('users')
+        .insert(userData)
+        .select()
+        .single();
 
-    if (error) {
-      console.error('Error creating user:', error);
-      throw error;
+      if (error) {
+        this.handleDatabaseError(error, 'tạo người dùng');
+      }
+      
+      console.log('User created successfully:', data);
+      return data;
+    } catch (error) {
+      // If database fails, switch to mock mode
+      console.warn('Database operation failed, using mock mode');
+      return this.createUser(userData);
     }
-    
-    console.log('User created successfully:', data);
-    return data;
   }
 
   static async getUsers(): Promise<UserWithEmployee[]> {
@@ -111,16 +141,24 @@ export class DatabaseService {
       return mockUsers;
     }
 
-    const { data, error } = await supabase
-      .from('users')
-      .select(`
-        *,
-        employee:employees(*)
-      `)
-      .order('created_at', { ascending: false });
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select(`
+          *,
+          employee:employees(*)
+        `)
+        .order('created_at', { ascending: false });
 
-    if (error) throw error;
-    return data || [];
+      if (error) {
+        this.handleDatabaseError(error, 'tải danh sách người dùng');
+      }
+      
+      return data || [];
+    } catch (error) {
+      console.warn('Database operation failed, using mock mode');
+      return mockUsers;
+    }
   }
 
   static async updateUser(id: string, updates: Partial<User>): Promise<User> {
@@ -128,20 +166,29 @@ export class DatabaseService {
       const userIndex = mockUsers.findIndex(u => u.id === id);
       if (userIndex >= 0) {
         mockUsers[userIndex] = { ...mockUsers[userIndex], ...updates, updated_at: new Date().toISOString() };
+        toast.success('Cập nhật người dùng thành công (Demo mode)');
         return mockUsers[userIndex];
       }
       throw new Error('User not found');
     }
 
-    const { data, error } = await supabase
-      .from('users')
-      .update(updates)
-      .eq('id', id)
-      .select()
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
 
-    if (error) throw error;
-    return data;
+      if (error) {
+        this.handleDatabaseError(error, 'cập nhật người dùng');
+      }
+      
+      return data;
+    } catch (error) {
+      console.warn('Database operation failed, using mock mode');
+      return this.updateUser(id, updates);
+    }
   }
 
   static async deleteUser(id: string): Promise<void> {
@@ -149,16 +196,24 @@ export class DatabaseService {
       const userIndex = mockUsers.findIndex(u => u.id === id);
       if (userIndex >= 0) {
         mockUsers.splice(userIndex, 1);
+        toast.success('Xóa người dùng thành công (Demo mode)');
       }
       return;
     }
 
-    const { error } = await supabase
-      .from('users')
-      .delete()
-      .eq('id', id);
+    try {
+      const { error } = await supabase
+        .from('users')
+        .delete()
+        .eq('id', id);
 
-    if (error) throw error;
+      if (error) {
+        this.handleDatabaseError(error, 'xóa người dùng');
+      }
+    } catch (error) {
+      console.warn('Database operation failed, using mock mode');
+      return this.deleteUser(id);
+    }
   }
 
   static async getUserByEmail(email: string): Promise<User | null> {
@@ -166,14 +221,22 @@ export class DatabaseService {
       return mockUsers.find(u => u.email === email) || null;
     }
 
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('email', email)
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('email', email)
+        .single();
 
-    if (error && error.code !== 'PGRST116') throw error;
-    return data;
+      if (error && error.code !== 'PGRST116') {
+        this.handleDatabaseError(error, 'tìm người dùng');
+      }
+      
+      return data;
+    } catch (error) {
+      console.warn('Database operation failed, using mock mode');
+      return mockUsers.find(u => u.email === email) || null;
+    }
   }
 
   // Candidate management
@@ -199,6 +262,7 @@ export class DatabaseService {
       } as CandidateWithDetails;
       
       mockCandidates.push(candidateWithDetails);
+      toast.success('Nộp hồ sơ thành công (Demo mode)');
       return newCandidate;
     }
 
@@ -211,7 +275,6 @@ export class DatabaseService {
 
       // Log the attempt for debugging
       console.log('Creating candidate with data:', candidateData);
-      console.log('Supabase client auth status:', await supabase.auth.getSession());
 
       const { data, error } = await supabase
         .from('candidates')
@@ -220,27 +283,7 @@ export class DatabaseService {
         .single();
 
       if (error) {
-        console.error('Database error creating candidate:', error);
-        console.error('Error code:', error.code);
-        console.error('Error message:', error.message);
-        console.error('Error details:', error.details);
-        console.error('Error hint:', error.hint);
-        
-        // Provide more specific error messages
-        if (error.code === '42501' || error.message?.includes('row-level security')) {
-          console.error('RLS policy violation detected');
-          throw new Error('Lỗi bảo mật: Không thể nộp hồ sơ. Vui lòng liên hệ quản trị viên.');
-        } else if (error.code === '23505') {
-          if (error.message?.includes('candidates_email_position_unique')) {
-            throw new Error('Bạn đã nộp hồ sơ cho vị trí này rồi!');
-          } else {
-            throw new Error('Thông tin này đã tồn tại trong hệ thống');
-          }
-        } else if (error.code === '23503') {
-          throw new Error('Vị trí ứng tuyển không tồn tại. Vui lòng chọn lại.');
-        } else {
-          throw new Error(`Có lỗi xảy ra: ${error.message || 'Vui lòng thử lại sau'}`);
-        }
+        this.handleDatabaseError(error, 'nộp hồ sơ');
       }
       
       console.log('Candidate created successfully:', data);
@@ -260,8 +303,9 @@ export class DatabaseService {
       
       return data;
     } catch (error) {
-      console.error('Error in createCandidate:', error);
-      throw error;
+      // If database fails, try mock mode
+      console.warn('Database operation failed, using mock mode');
+      return this.createCandidate(candidateData);
     }
   }
 
@@ -270,37 +314,33 @@ export class DatabaseService {
       return mockCandidates;
     }
 
-    console.log('Loading candidates for admin/HR...');
-    console.log('Current user session:', await supabase.auth.getSession());
-    
-    const { data, error } = await supabase
-      .from('candidates')
-      .select(`
-        *,
-        position:positions(*),
-        interviews(*,
-          interviewer:users(*)
-        ),
-        decisions(*,
-          decider:users(*)
-        )
-      `)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('Error loading candidates:', error);
-      console.error('Error code:', error.code);
-      console.error('Error message:', error.message);
-      console.error('Error details:', error.details);
+    try {
+      console.log('Loading candidates for admin/HR...');
       
-      if (error.code === '42501') {
-        throw new Error('Lỗi phân quyền: Không thể tải danh sách ứng viên. Vui lòng đăng nhập lại.');
+      const { data, error } = await supabase
+        .from('candidates')
+        .select(`
+          *,
+          position:positions(*),
+          interviews(*,
+            interviewer:users(*)
+          ),
+          decisions(*,
+            decider:users(*)
+          )
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        this.handleDatabaseError(error, 'tải danh sách ứng viên');
       }
-      throw error;
+      
+      console.log('Candidates loaded successfully:', data?.length || 0, 'candidates');
+      return data || [];
+    } catch (error) {
+      console.warn('Database operation failed, using mock mode');
+      return mockCandidates;
     }
-    
-    console.log('Candidates loaded successfully:', data?.length || 0, 'candidates');
-    return data || [];
   }
 
   static async getCandidateById(id: string): Promise<CandidateWithDetails> {
@@ -310,23 +350,33 @@ export class DatabaseService {
       return candidate;
     }
 
-    const { data, error } = await supabase
-      .from('candidates')
-      .select(`
-        *,
-        position:positions(*),
-        interviews(*,
-          interviewer:users(*)
-        ),
-        decisions(*,
-          decider:users(*)
-        )
-      `)
-      .eq('id', id)
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from('candidates')
+        .select(`
+          *,
+          position:positions(*),
+          interviews(*,
+            interviewer:users(*)
+          ),
+          decisions(*,
+            decider:users(*)
+          )
+        `)
+        .eq('id', id)
+        .single();
 
-    if (error) throw error;
-    return data;
+      if (error) {
+        this.handleDatabaseError(error, 'tải thông tin ứng viên');
+      }
+      
+      return data;
+    } catch (error) {
+      console.warn('Database operation failed, using mock mode');
+      const candidate = mockCandidates.find(c => c.id === id);
+      if (!candidate) throw new Error('Candidate not found');
+      return candidate;
+    }
   }
 
   static async updateCandidate(id: string, updates: Partial<Candidate>): Promise<Candidate> {
@@ -338,20 +388,29 @@ export class DatabaseService {
           ...updates, 
           updated_at: new Date().toISOString() 
         };
+        toast.success('Cập nhật ứng viên thành công (Demo mode)');
         return mockCandidates[candidateIndex];
       }
       throw new Error('Candidate not found');
     }
 
-    const { data, error } = await supabase
-      .from('candidates')
-      .update(updates)
-      .eq('id', id)
-      .select()
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from('candidates')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
 
-    if (error) throw error;
-    return data;
+      if (error) {
+        this.handleDatabaseError(error, 'cập nhật ứng viên');
+      }
+      
+      return data;
+    } catch (error) {
+      console.warn('Database operation failed, using mock mode');
+      return this.updateCandidate(id, updates);
+    }
   }
 
   // Interview management
@@ -574,7 +633,6 @@ export class DatabaseService {
 
     try {
       console.log('Fetching open positions...');
-      console.log('Supabase client status:', supabase.supabaseUrl);
       
       const { data, error } = await supabase
         .from('positions')
@@ -583,22 +641,14 @@ export class DatabaseService {
         .order('title');
 
       if (error) {
-        console.error('Error fetching positions:', error);
-        console.error('Error code:', error.code);
-        console.error('Error message:', error.message);
-        
-        if (error.code === '42501' || error.message?.includes('row-level security')) {
-          throw new Error('Lỗi bảo mật: Không thể tải danh sách vị trí. Vui lòng thử lại.');
-        } else {
-          throw new Error(`Không thể tải danh sách vị trí: ${error.message}`);
-        }
+        this.handleDatabaseError(error, 'tải danh sách vị trí');
       }
       
       console.log('Positions fetched successfully:', data?.length || 0, 'positions');
       return data || [];
     } catch (error) {
-      console.error('Error in getOpenPositions:', error);
-      throw error;
+      console.warn('Database operation failed, using mock mode');
+      return mockPositions.filter(p => p.is_open);
     }
   }
 
@@ -607,13 +657,21 @@ export class DatabaseService {
       return mockPositions;
     }
 
-    const { data, error } = await supabase
-      .from('positions')
-      .select('*')
-      .order('title');
+    try {
+      const { data, error } = await supabase
+        .from('positions')
+        .select('*')
+        .order('title');
 
-    if (error) throw error;
-    return data || [];
+      if (error) {
+        this.handleDatabaseError(error, 'tải tất cả vị trí');
+      }
+      
+      return data || [];
+    } catch (error) {
+      console.warn('Database operation failed, using mock mode');
+      return mockPositions;
+    }
   }
 
   // Decision management

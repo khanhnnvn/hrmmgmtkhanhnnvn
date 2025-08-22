@@ -4,29 +4,66 @@ import type { Database } from '../types/database';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-console.log('Supabase configuration check:');
-console.log('URL:', supabaseUrl);
-console.log('Anon Key present:', !!supabaseAnonKey);
+// Only log in development mode
+if (import.meta.env.DEV) {
+  console.log('Supabase configuration check:');
+  console.log('URL:', supabaseUrl);
+  console.log('Anon Key present:', !!supabaseAnonKey);
+}
 
 // Create a mock client for development when Supabase is not configured
 const createMockClient = () => {
-  console.warn('Creating mock Supabase client - database operations will be simulated');
+  if (import.meta.env.DEV) {
+    console.warn('Creating mock Supabase client - database operations will be simulated');
+  }
   
   return {
     from: (table: string) => ({
-      select: () => Promise.resolve({ data: [], error: null }),
-      insert: () => Promise.resolve({ data: null, error: null }),
-      update: () => Promise.resolve({ data: null, error: null }),
-      delete: () => Promise.resolve({ data: null, error: null }),
+      select: (columns?: string) => ({
+        eq: () => ({ 
+          select: () => Promise.resolve({ data: [], error: null }),
+          single: () => Promise.resolve({ data: null, error: null }),
+          order: () => Promise.resolve({ data: [], error: null })
+        }),
+        single: () => Promise.resolve({ data: null, error: null }),
+        order: () => Promise.resolve({ data: [], error: null }),
+        then: (resolve: any) => resolve({ data: [], error: null })
+      }),
+      insert: (data: any) => ({
+        select: () => ({
+          single: () => Promise.resolve({ data: null, error: null }),
+          then: (resolve: any) => resolve({ data: null, error: null })
+        }),
+        then: (resolve: any) => resolve({ data: null, error: null })
+      }),
+      update: (data: any) => ({
+        eq: () => ({
+          select: () => ({
+            single: () => Promise.resolve({ data: null, error: null }),
+            then: (resolve: any) => resolve({ data: null, error: null })
+          }),
+          then: (resolve: any) => resolve({ data: null, error: null })
+        }),
+        then: (resolve: any) => resolve({ data: null, error: null })
+      }),
+      delete: () => ({
+        eq: () => Promise.resolve({ data: null, error: null }),
+        then: (resolve: any) => resolve({ data: null, error: null })
+      }),
       eq: () => ({ 
         select: () => Promise.resolve({ data: [], error: null }),
-        single: () => Promise.resolve({ data: null, error: null })
+        single: () => Promise.resolve({ data: null, error: null }),
+        update: () => Promise.resolve({ data: null, error: null }),
+        delete: () => Promise.resolve({ data: null, error: null })
       }),
       single: () => Promise.resolve({ data: null, error: null })
     }),
     auth: {
       getSession: () => Promise.resolve({ data: { session: null }, error: null }),
-      signInWithPassword: () => Promise.resolve({ data: null, error: { message: 'Mock auth - use demo accounts' } }),
+      signInWithPassword: () => Promise.resolve({ 
+        data: null, 
+        error: { message: 'Mock auth - sử dụng tài khoản demo: admin@company.com / admin123' } 
+      }),
       signOut: () => Promise.resolve({ error: null })
     }
   } as any;
@@ -43,7 +80,9 @@ let supabase: any;
 
 if (isSupabaseConfigured) {
   try {
-    console.log('Initializing Supabase client with real credentials...');
+    if (import.meta.env.DEV) {
+      console.log('Initializing Supabase client with real credentials...');
+    }
     supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
       auth: {
         persistSession: false,
@@ -69,14 +108,18 @@ if (isSupabaseConfigured) {
         }
       }
     });
-    console.log('Supabase client initialized successfully');
+    if (import.meta.env.DEV) {
+      console.log('Supabase client initialized successfully');
+    }
   } catch (error) {
     console.error('Failed to initialize Supabase client:', error);
     supabase = createMockClient();
   }
 } else {
-  console.warn('Supabase not configured properly, using mock client');
-  console.warn('To use real database, please configure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env file');
+  if (import.meta.env.DEV) {
+    console.warn('Supabase not configured properly, using mock client');
+    console.warn('To use real database, please configure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env file');
+  }
   supabase = createMockClient();
 }
 
