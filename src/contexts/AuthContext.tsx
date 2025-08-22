@@ -110,6 +110,30 @@ export function AuthProvider({ children }: AuthProviderProps) {
           return false;
         }
 
+        setUser(dbUser);
+        setRole(dbUser.role);
+        toast.success('Đăng nhập thành công');
+        return true;
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      toast.error('Có lỗi xảy ra khi đăng nhập');
+    }
+    return false;
+  };
+
+  const logout = async () => {
+    try {
+      await supabase.auth.signOut();
+      setUser(null);
+      setRole(null);
+      toast.success('Đăng xuất thành công');
+    } catch (error) {
+      console.error('Logout error:', error);
+      toast.error('Có lỗi xảy ra khi đăng xuất');
+    }
+  };
+
   return (
     <AuthContext.Provider value={{ user, role, loading, login, logout }}>
       {children}
