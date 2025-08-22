@@ -78,25 +78,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         return false;
       }
       
-      // For testing: Try to find user in database first and bypass Supabase Auth if needed
-      console.log('🔍 Checking user in database...');
-      const dbUser = await DatabaseService.getUserByEmail(email);
-      
-      if (dbUser && dbUser.status === 'ACTIVE') {
-        console.log('✅ User found in database:', dbUser.full_name);
-        
-        // For demo purposes, accept any password for existing database users
-        // In production, you should validate the password properly
-        if (password && password.length > 0) {
-          console.log('✅ Bypassing Supabase Auth for database user');
-          setUser(dbUser);
-          setRole(dbUser.role);
-          toast.success('Đăng nhập thành công (Database user)');
-          return true;
-        }
-      }
-      
-      // First, try to authenticate with Supabase Auth
+      // Authenticate with Supabase Auth
       console.log('🔐 Attempting Supabase Auth...');
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -110,12 +92,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         if (error.message.includes('Failed to fetch') || error.message.includes('fetch')) {
           toast.error('Không thể kết nối đến server. Vui lòng kiểm tra kết nối mạng và thử lại.');
         } else if (error.message.includes('Invalid login credentials')) {
-          // If Supabase auth fails but user exists in database, suggest using database login
-          if (dbUser) {
-            toast.error('Tài khoản chưa được đồng bộ với hệ thống xác thực. Vui lòng liên hệ quản trị viên.');
-          } else {
-            toast.error('Email hoặc mật khẩu không chính xác');
-          }
+          toast.error('Email hoặc mật khẩu không chính xác');
         } else if (error.message.includes('Email not confirmed')) {
           toast.error('Vui lòng xác nhận email trước khi đăng nhập');
         } else {
@@ -127,25 +104,25 @@ export function AuthProvider({ children }: AuthProviderProps) {
       if (data.user) {
         console.log('✅ Supabase Auth successful');
         // Get user details from database
-        const authDbUser = await DatabaseService.getUserByEmail(email);
+        const dbUser = await DatabaseService.getUserByEmail(email);
         
-        if (!authDbUser) {
+        if (!dbUser) {
           console.error('User not found in database');
           toast.error('Tài khoản không tồn tại trong hệ thống');
           await supabase.auth.signOut();
           return false;
         }
 
-        if (authDbUser.status !== 'ACTIVE') {
+        if (dbUser.status !== 'ACTIVE') {
           console.error('User account is disabled');
           toast.error('Tài khoản đã bị vô hiệu hóa');
           await supabase.auth.signOut();
           return false;
         }
 
-        setUser(authDbUser);
-        setRole(authDbUser.role);
-        toast.success('Đăng nhập thành công (Supabase Auth)');
+        setUser(dbUser);
+        setRole(dbUser.role);
+        toast.success('Đăng nhập thành công');
         return true;
       }
     } catch (error) {

@@ -97,10 +97,13 @@ export function LoginForm() {
             <h3 className="font-medium text-gray-900 mb-2">Tài khoản demo:</h3>
             <div className="space-y-2 text-sm text-gray-600">
               <div>
-                <strong>Lưu ý:</strong> Hệ thống sẽ tự động kiểm tra tài khoản trong database
+                <strong>Email:</strong> admin@company.com
               </div>
               <div>
-                <strong>Thử nghiệm:</strong> Nhập email có trong database với bất kỳ mật khẩu nào
+                <strong>Mật khẩu:</strong> admin123
+              </div>
+              <div className="text-xs text-gray-500 mt-2">
+                Tài khoản admin sẽ được tự động tạo nếu chưa tồn tại
               </div>
             </div>
           </div>

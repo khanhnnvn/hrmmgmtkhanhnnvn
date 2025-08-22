@@ -87,6 +87,93 @@ export class DatabaseService {
     }
   }
 
+  // Create admin user with Supabase Auth
+  static async createAdminUser(): Promise<User> {
+    try {
+      console.log('Creating admin user...');
+      
+      const adminData = {
+        email: 'admin@company.com',
+        password: 'admin123',
+        full_name: 'Quản trị viên hệ thống',
+        username: 'admin',
+        phone: '0912345678',
+        role: 'ADMIN' as const,
+        status: 'ACTIVE' as const
+      };
+
+      // Create user in Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: adminData.email,
+        password: adminData.password,
+      });
+
+      if (authError) {
+        console.error('Auth signup error:', authError);
+        throw new Error(`Lỗi tạo tài khoản admin: ${authError.message}`);
+      }
+
+      if (!authData.user) {
+        throw new Error('Không thể tạo tài khoản admin');
+      }
+
+      console.log('Admin auth user created with ID:', authData.user.id);
+
+      // Create user record in database
+      const { data: dbUser, error: dbError } = await supabase
+        .from('users')
+        .insert({
+          id: authData.user.id,
+          email: adminData.email,
+          full_name: adminData.full_name,
+          username: adminData.username,
+          phone: adminData.phone,
+          role: adminData.role,
+          status: adminData.status
+        })
+        .select()
+        .single();
+
+      if (dbError) {
+        console.error('Database insert error:', dbError);
+        // If database insert fails, clean up auth user
+        try {
+          await supabase.auth.admin.deleteUser(authData.user.id);
+        } catch (cleanupError) {
+          console.error('Failed to cleanup auth user:', cleanupError);
+        }
+        this.handleDatabaseError(dbError, 'tạo bản ghi admin');
+      }
+
+      console.log('Admin user created successfully:', dbUser);
+      return dbUser;
+    } catch (error) {
+      this.handleDatabaseError(error, 'tạo tài khoản admin');
+    }
+  }
+
+  // Check if admin user exists
+  static async checkAdminExists(): Promise<boolean> {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('id')
+        .eq('email', 'admin@company.com')
+        .eq('role', 'ADMIN')
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error checking admin:', error);
+        return false;
+      }
+
+      return !!data;
+    } catch (error) {
+      console.error('Error in checkAdminExists:', error);
+      return false;
+    }
+  }
+
   static async getUsers(): Promise<UserWithEmployee[]> {
     try {
       const { data, error } = await supabase
