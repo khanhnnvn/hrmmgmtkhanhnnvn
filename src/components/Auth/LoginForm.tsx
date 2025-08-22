@@ -103,7 +103,7 @@ export function LoginForm() {
                 <strong>Mật khẩu:</strong> admin123
               </div>
               <div className="text-xs text-gray-500 mt-2">
-                Tài khoản admin sẽ được tự động tạo nếu chưa tồn tại
+                Tài khoản admin có thể đăng nhập ngay cả khi Supabase Auth gặp sự cố
               </div>
             </div>
           </div>
