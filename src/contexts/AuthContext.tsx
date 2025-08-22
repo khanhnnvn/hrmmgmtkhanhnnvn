@@ -166,10 +166,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
           // For admin user, fall back to database authentication
           if (email === 'admin@company.com') {
             console.log('🔄 Falling back to database authentication for admin');
-            setUser(dbUser);
-            setRole(dbUser.role);
-            toast.success('Đăng nhập thành công (Fallback)');
-            return true;
+            // Check if password matches admin123
+            if (password === 'admin123') {
+              setUser(dbUser);
+              setRole(dbUser.role);
+              toast.success('Đăng nhập thành công (Fallback)');
+              return true;
+            } else {
+              toast.error('Mật khẩu admin không chính xác. Vui lòng sử dụng: admin123');
+              return false;
+            }
           }
           
           // Handle specific error types for other users
@@ -204,7 +210,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
           return true;
         }
         
-        toast.error('Có lỗi xảy ra khi đăng nhập');
+        if (email === 'admin@company.com') {
+          toast.error('Mật khẩu admin không chính xác. Vui lòng sử dụng: admin123');
+        } else {
+          toast.error('Có lỗi xảy ra khi đăng nhập');
+        }
         return false;
       }
     } catch (error) {
