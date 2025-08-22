@@ -17,7 +17,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
   supabase = createClient(placeholderUrl, placeholderKey);
   isUsingMockClient = true;
 } else if (supabaseUrl === 'YOUR_SUPABASE_URL' || supabaseAnonKey === 'YOUR_SUPABASE_ANON_KEY') {
-  console.error('Please replace placeholder values in .env file with your actual Supabase project credentials');
+  console.warn('Please replace placeholder values in .env file with your actual Supabase project credentials');
   // Use placeholder values to prevent app crash
   const placeholderUrl = 'https://placeholder.supabase.co';
   const placeholderKey = 'placeholder-key';
