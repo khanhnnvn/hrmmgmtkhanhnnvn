@@ -10,7 +10,6 @@ interface AuthContextType {
   loading: boolean;
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
-  createDemoUsers: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -111,80 +110,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
           return false;
         }
 
-        console.log('Login successful for user:', dbUser.full_name);
-        setUser(dbUser);
-        setRole(dbUser.role);
-        
-        // Create audit log
-        try {
-          await DatabaseService.createAuditLog({
-            actor_id: dbUser.id,
-            action: 'LOGIN',
-            target_type: 'USER',
-            target_id: dbUser.id,
-          });
-        } catch (auditError) {
-          console.warn('Failed to create login audit log:', auditError);
-        }
-        
-        toast.success(`Chào mừng ${dbUser.full_name}!`);
-        return true;
-      }
-
-      return false;
-    } catch (error) {
-      console.error('Login error:', error);
-      
-      let errorMessage = 'Đã xảy ra lỗi khi đăng nhập';
-      if (error instanceof Error) {
-        if (error.message.includes('Failed to fetch') || error.message.includes('fetch')) {
-          errorMessage = 'Không thể kết nối đến server. Vui lòng kiểm tra cấu hình Supabase và kết nối mạng.';
-        } else if (error.message.includes('Invalid login credentials')) {
-          errorMessage = 'Email hoặc mật khẩu không chính xác';
-        } else if (error.message.includes('Email not confirmed')) {
-          errorMessage = 'Vui lòng xác nhận email trước khi đăng nhập';
-        } else if (error.message.includes('Too many requests')) {
-          errorMessage = 'Quá nhiều lần thử. Vui lòng thử lại sau';
-        } else {
-          errorMessage = error.message;
-        }
-      }
-      
-      toast.error(errorMessage);
-      return false;
-    }
-  };
-
-  const logout = async () => {
-    try {
-      if (user) {
-        // Create logout audit log
-        try {
-          await DatabaseService.createAuditLog({
-            actor_id: user.id,
-            action: 'LOGOUT',
-            target_type: 'USER',
-            target_id: user.id,
-          });
-        } catch (auditError) {
-          console.warn('Failed to create logout audit log:', auditError);
-        }
-      }
-      
-      // Sign out from Supabase
-      await supabase.auth.signOut();
-      
-      setUser(null);
-      setRole(null);
-      toast.success('Đăng xuất thành công');
-    } catch (error) {
-      console.error('Logout error:', error);
-      toast.error('Có lỗi xảy ra khi đăng xuất');
-    }
-  };
-
   return (
-    <AuthContext.Provider value={{ user, role, loading, login, logout, createDemoUsers }}>
+    <AuthContext.Provider value={{ user, role, loading, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

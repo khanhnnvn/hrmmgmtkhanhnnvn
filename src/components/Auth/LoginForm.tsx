@@ -97,19 +97,12 @@ export function LoginForm() {
             <h3 className="font-medium text-gray-900 mb-2">Tài khoản demo:</h3>
             <div className="space-y-2 text-sm text-gray-600">
               <div>
-                <strong>Admin:</strong> admin@company.com / admin123
+                <strong>Lưu ý:</strong> Sử dụng tài khoản có trong database
               </div>
               <div>
-                <strong>HR:</strong> hr@company.com / admin123
+                <strong>Liên hệ:</strong> Quản trị viên để lấy thông tin đăng nhập
               </div>
             </div>
-            <button
-              type="button"
-              onClick={createDemoUsers}
-              className="mt-3 w-full bg-green-600 text-white py-2 px-4 rounded-lg text-sm font-medium hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors"
-            >
-              Tạo tài khoản demo
-            </button>
           </div>
         </div>
       </div>
