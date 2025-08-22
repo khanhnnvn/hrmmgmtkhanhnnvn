@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { DatabaseService } from '../lib/database';
+import { supabase } from '../lib/supabase';
 import type { User, UserRole } from '../types/database';
 import toast from 'react-hot-toast';
 
