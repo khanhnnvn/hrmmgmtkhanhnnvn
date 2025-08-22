@@ -10,6 +10,7 @@ interface AuthContextType {
   loading: boolean;
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
+  createDemoUsers: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
