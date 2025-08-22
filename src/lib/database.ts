@@ -84,10 +84,10 @@ export class DatabaseService {
       errorMessage = 'Dữ liệu đã tồn tại trong hệ thống';
     } else if (error?.code === '23503') {
       errorMessage = 'Dữ liệu tham chiếu không tồn tại';
-    } else if (error?.message?.includes('fetch') || error?.message?.includes('network')) {
-      errorMessage = 'Lỗi kết nối mạng. Đang chuyển sang chế độ demo...';
-      // Switch to mock mode on network errors
-      console.warn('Network error detected, switching to mock mode');
+    } else if (error?.message?.includes('fetch') || error?.message?.includes('network') || error?.message?.includes('Failed to fetch')) {
+      // Don't throw error for fetch failures, let the calling method handle fallback
+      console.warn('Network error detected, caller should handle fallback to mock mode');
+      throw new Error('NETWORK_ERROR');
     } else if (error?.message) {
       errorMessage = error.message;
     }
@@ -234,8 +234,12 @@ export class DatabaseService {
       
       return data;
     } catch (error) {
-      console.warn('Database operation failed, using mock mode');
-      return mockUsers.find(u => u.email === email) || null;
+      if (error instanceof Error && error.message === 'NETWORK_ERROR') {
+        console.warn('Network error in getUserByEmail, falling back to mock data');
+        return mockUsers.find(u => u.email === email) || null;
+      }
+      // Re-throw other errors
+      throw error;
     }
   }
 

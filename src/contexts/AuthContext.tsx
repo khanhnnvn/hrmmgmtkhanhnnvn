@@ -117,8 +117,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
             return true;
           }
         } catch (dbError) {
-          console.warn('Database login failed, falling back to demo mode:', dbError);
-          toast.error('Lỗi kết nối database. Vui lòng sử dụng tài khoản demo.');
+          console.warn('Database login failed:', dbError);
+          if (dbError instanceof Error && dbError.message === 'NETWORK_ERROR') {
+            toast.error('Không thể kết nối database. Vui lòng sử dụng tài khoản demo: admin@company.com / admin123');
+          } else {
+            toast.error('Lỗi database. Vui lòng sử dụng tài khoản demo: admin@company.com / admin123');
+          }
         }
       } else {
         console.log('Mock client active - only demo users available');
