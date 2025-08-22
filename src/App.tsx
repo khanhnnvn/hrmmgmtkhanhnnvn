@@ -21,138 +21,138 @@ import { EmployeeProfile } from './pages/Employee/EmployeeProfile';
 import { InterviewAssignments } from './pages/Employee/InterviewAssignments';
 import { Unauthorized } from './pages/Unauthorized';
 
-function App() {
-  function AppRoutes() {
-    const { user, role } = useAuth();
+function AppRoutes() {
+  const { user, role } = useAuth();
 
-    return (
-      <Routes>
-        {/* Public routes */}
-        <Route 
-          path="/login" 
-          element={user ? (
+  return (
+    <Routes>
+      {/* Public routes */}
+      <Route 
+        path="/login" 
+        element={user ? (
+          <Navigate to={
+            role === 'ADMIN' ? '/dashboard' : 
+            role === 'HR' ? '/candidates' : 
+            '/employee'
+          } replace />
+        ) : <LoginForm />} 
+      />
+      <Route path="/apply" element={<CandidateApplicationForm />} />
+      <Route path="/unauthorized" element={<Unauthorized />} />
+
+      {/* Protected routes */}
+      <Route
+        path="/dashboard"
+        element={
+          <ProtectedRoute allowedRoles={['ADMIN']}>
+            <Layout>
+              <Dashboard />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/candidates"
+        element={
+          <ProtectedRoute allowedRoles={['ADMIN', 'HR']}>
+            <Layout>
+              <CandidateList />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/candidates/:id"
+        element={
+          <ProtectedRoute allowedRoles={['ADMIN', 'HR']}>
+            <Layout>
+              <CandidateDetail />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/interviews"
+        element={
+          <ProtectedRoute allowedRoles={['ADMIN', 'HR']}>
+            <Layout>
+              <InterviewList />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/users"
+        element={
+          <ProtectedRoute allowedRoles={['ADMIN', 'HR']}>
+            <Layout>
+              <UserList />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/employee"
+        element={
+          <ProtectedRoute allowedRoles={['EMPLOYEE']}>
+            <Layout>
+              <EmployeeProfile />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/employee/profile"
+        element={
+          <ProtectedRoute allowedRoles={['EMPLOYEE']}>
+            <Layout>
+              <EmployeeProfile />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/employee/interviews"
+        element={
+          <ProtectedRoute allowedRoles={['EMPLOYEE']}>
+            <Layout>
+              <InterviewAssignments />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Default redirect */}
+      <Route
+        path="/"
+        element={
+          user ? (
             <Navigate to={
               role === 'ADMIN' ? '/dashboard' : 
               role === 'HR' ? '/candidates' : 
-              '/employee'
+              role === 'EMPLOYEE' ? '/employee' : 
+              '/login'
             } replace />
-          ) : <LoginForm />} 
-        />
-        <Route path="/apply" element={<CandidateApplicationForm />} />
-        <Route path="/unauthorized" element={<Unauthorized />} />
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
+      />
+      
+      {/* Catch all route */}
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+}
 
-        {/* Protected routes */}
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute allowedRoles={['ADMIN']}>
-              <Layout>
-                <Dashboard />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/candidates"
-          element={
-            <ProtectedRoute allowedRoles={['ADMIN', 'HR']}>
-              <Layout>
-                <CandidateList />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/candidates/:id"
-          element={
-            <ProtectedRoute allowedRoles={['ADMIN', 'HR']}>
-              <Layout>
-                <CandidateDetail />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/interviews"
-          element={
-            <ProtectedRoute allowedRoles={['ADMIN', 'HR']}>
-              <Layout>
-                <InterviewList />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/users"
-          element={
-            <ProtectedRoute allowedRoles={['ADMIN', 'HR']}>
-              <Layout>
-                <UserList />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/employee"
-          element={
-            <ProtectedRoute allowedRoles={['EMPLOYEE']}>
-              <Layout>
-                <EmployeeProfile />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/employee/profile"
-          element={
-            <ProtectedRoute allowedRoles={['EMPLOYEE']}>
-              <Layout>
-                <EmployeeProfile />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/employee/interviews"
-          element={
-            <ProtectedRoute allowedRoles={['EMPLOYEE']}>
-              <Layout>
-                <InterviewAssignments />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-
-        {/* Default redirect */}
-        <Route
-          path="/"
-          element={
-            user ? (
-              <Navigate to={
-                role === 'ADMIN' ? '/dashboard' : 
-                role === 'HR' ? '/candidates' : 
-                role === 'EMPLOYEE' ? '/employee' : 
-                '/login'
-              } replace />
-            ) : (
-              <Navigate to="/login" replace />
-            )
-          }
-        />
-        
-        {/* Catch all route */}
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    );
-  }
-
+function App() {
   return (
     <Router>
       <AuthProvider>
