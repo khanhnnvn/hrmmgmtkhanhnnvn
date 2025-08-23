@@ -32,7 +32,8 @@ export function CandidateApplicationForm() {
       const data = await DatabaseService.getOpenPositions();
       setPositions(data);
     } catch (error) {
-      console.error('Error loading positions:', error);
+      // If positions fail to load, show a user-friendly message
+      toast.error('Không thể tải danh sách vị trí. Vui lòng thử lại.');
     }
   };
 
@@ -100,16 +101,12 @@ export function CandidateApplicationForm() {
       setSelectedFile(null);
       toast.success('Nộp hồ sơ thành công! Chúng tôi sẽ liên hệ với bạn sớm nhất.');
     } catch (error: any) {
-      console.error('Form submission error:', error);
-      
       // Show user-friendly error message
       let errorMessage = 'Có lỗi xảy ra khi nộp hồ sơ. Vui lòng thử lại.';
       
       if (error?.message) {
         if (error.message.includes('đã nộp hồ sơ')) {
           errorMessage = 'Bạn đã nộp hồ sơ cho vị trí này rồi!';
-        } else if (error.message.includes('phân quyền')) {
-          errorMessage = 'Có lỗi hệ thống. Vui lòng liên hệ HR để được hỗ trợ.';
         }
       }
       

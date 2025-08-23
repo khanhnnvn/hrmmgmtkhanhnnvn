@@ -19,20 +19,16 @@ export class DatabaseService {
   private static handleDatabaseError(error: any, operation: string): never {
     console.error(`Database error in ${operation}:`, error);
     
-    let errorMessage = `Lỗi ${operation}`;
+    let errorMessage = 'Có lỗi xảy ra. Vui lòng thử lại.';
     
-    if (error?.code === '42501' || error?.message?.includes('row-level security') || error?.message?.includes('policy')) {
-      errorMessage = 'Lỗi phân quyền: Vui lòng đăng nhập lại hoặc liên hệ quản trị viên';
+    if (error?.code === '42501' || error?.message?.includes('row-level security')) {
+      errorMessage = 'Không có quyền truy cập. Vui lòng thử lại.';
     } else if (error?.code === '23505') {
       errorMessage = 'Dữ liệu đã tồn tại trong hệ thống';
     } else if (error?.code === '23503') {
       errorMessage = 'Dữ liệu tham chiếu không tồn tại';
     } else if (error?.code === 'PGRST116') {
       errorMessage = 'Không tìm thấy dữ liệu';
-    } else if (error?.message?.includes('fetch') || error?.message?.includes('network')) {
-      errorMessage = 'Lỗi kết nối mạng: Vui lòng kiểm tra internet và thử lại';
-    } else if (error?.message) {
-      errorMessage = error.message;
     }
     
     throw new Error(errorMessage);
@@ -285,8 +281,6 @@ export class DatabaseService {
 
   static async getUserByEmail(email: string): Promise<User | null> {
     try {
-      console.log('🔍 Looking for user with email:', email);
-      
       const { data, error } = await supabase
         .from('users')
         .select('*')
@@ -295,19 +289,11 @@ export class DatabaseService {
         .single();
 
       if (error && error.code !== 'PGRST116') {
-        console.error('Database error finding user:', error);
         return null; // Return null instead of throwing error for user lookup
-      }
-      
-      if (data) {
-        console.log('✅ User found:', data.full_name, '- Role:', data.role);
-      } else {
-        console.log('❌ No user found with email:', email);
       }
       
       return data;
     } catch (error) {
-      console.error('Exception in getUserByEmail:', error);
       return null; // Always return null for user lookup errors
     }
   }
@@ -319,7 +305,6 @@ export class DatabaseService {
         throw new Error('Vui lòng chọn vị trí ứng tuyển');
       }
 
-      console.log('Creating candidate with data:', candidateData);
 
       const { data, error } = await supabase
         .from('candidates')
@@ -328,14 +313,11 @@ export class DatabaseService {
         .single();
 
       if (error) {
-        console.error('Candidate creation error:', error);
         if (error.code === '23505') {
           throw new Error('Bạn đã nộp hồ sơ cho vị trí này rồi!');
         }
         this.handleDatabaseError(error, 'nộp hồ sơ');
       }
-      
-      console.log('Candidate created successfully:', data);
       
       // Create audit log
       try {
@@ -346,7 +328,6 @@ export class DatabaseService {
           payload_json: { candidate_name: data.full_name, position_id: data.applied_position_id }
         });
       } catch (auditError) {
-        console.warn('Failed to create audit log:', auditError);
         // Don't fail the candidate creation if audit log fails
       }
       
@@ -358,8 +339,6 @@ export class DatabaseService {
 
   static async getCandidates(): Promise<CandidateWithDetails[]> {
     try {
-      console.log('Loading candidates...');
-      
       const { data, error } = await supabase
         .from('candidates')
         .select(`
@@ -378,7 +357,6 @@ export class DatabaseService {
         this.handleDatabaseError(error, 'tải danh sách ứng viên');
       }
       
-      console.log('Candidates loaded successfully:', data?.length || 0, 'candidates');
       return data || [];
     } catch (error) {
       this.handleDatabaseError(error, 'tải danh sách ứng viên');
@@ -702,8 +680,6 @@ export class DatabaseService {
   // Position management
   static async getOpenPositions(): Promise<Position[]> {
     try {
-      console.log('Fetching open positions...');
-      
       const { data, error } = await supabase
         .from('positions')
         .select('*')
@@ -711,11 +687,9 @@ export class DatabaseService {
         .order('title');
 
       if (error) {
-        console.error('Error fetching positions:', error);
         this.handleDatabaseError(error, 'tải danh sách vị trí');
       }
       
-      console.log('Positions fetched successfully:', data?.length || 0, 'positions');
       return data || [];
     } catch (error) {
       this.handleDatabaseError(error, 'tải danh sách vị trí');

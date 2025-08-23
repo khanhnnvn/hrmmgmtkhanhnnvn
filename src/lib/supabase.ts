@@ -19,21 +19,16 @@ if (supabaseUrl === 'YOUR_SUPABASE_URL' || supabaseAnonKey === 'YOUR_SUPABASE_AN
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,
-    autoRefreshToken: true,
+    autoRefreshToken: false,
     detectSessionInUrl: false,
-    flowType: 'implicit',
-    confirmationUrl: undefined,
-    // Allow anonymous access
-    autoRefreshToken: false
+    flowType: 'implicit'
   },
   db: {
     schema: 'public'
   },
   global: {
     headers: {
-      'X-Client-Info': 'recruitment-system@1.0.0',
-      'apikey': supabaseAnonKey,
-      'Authorization': `Bearer ${supabaseAnonKey}`
+      'X-Client-Info': 'recruitment-system@1.0.0'
     }
   },
   realtime: {
@@ -43,25 +38,7 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   }
 });
 
-// Helper function to check if email confirmation is disabled
-export const checkEmailConfirmationStatus = async () => {
-  try {
-    const { data, error } = await supabase.auth.getSession();
-    console.log('Current auth session:', data?.session ? 'Active' : 'None');
-    return !error;
-  } catch (error) {
-    console.error('Error checking email confirmation status:', error);
-    return false;
-  }
-};
-
 // Test connection
-supabase.auth.getSession().then(({ data, error }) => {
-  if (error) {
-    console.warn('Supabase auth session error (may be normal for anonymous access):', error);
-  } else {
-    console.log('✅ Supabase connected successfully');
-  }
-});
+console.log('✅ Supabase client initialized');
 
 export const isUsingMockClient = false;
