@@ -73,11 +73,8 @@ export function CandidateApplicationForm() {
 
   const onSubmit = async (data: CandidateFormData) => {
     try {
-      console.log('Form submission started with data:', data);
-      
       // Validate required fields
       if (!data.applied_position_id) {
-        console.error('No position selected');
         toast.error('Vui lòng chọn vị trí ứng tuyển');
         return;
       }
@@ -85,13 +82,10 @@ export function CandidateApplicationForm() {
       // Validate position exists
       const selectedPosition = positions.find(p => p.id === data.applied_position_id);
       if (!selectedPosition) {
-        console.error('Selected position not found in positions list');
         toast.error('Vị trí ứng tuyển không hợp lệ. Vui lòng chọn lại.');
         return;
       }
 
-      console.log('Validation passed, creating candidate...');
-      
       // Prepare candidate data
       const candidateData = {
         ...data,
@@ -99,11 +93,8 @@ export function CandidateApplicationForm() {
         cv_url: selectedFile ? `uploads/${Date.now()}_${selectedFile.name}` : ''
       };
 
-      console.log('Submitting candidate application...');
-      
       await DatabaseService.createCandidate(candidateData);
       
-      console.log('Candidate created successfully');
       setIsSubmitted(true);
       reset();
       setSelectedFile(null);
@@ -112,19 +103,13 @@ export function CandidateApplicationForm() {
       console.error('Form submission error:', error);
       
       // Show user-friendly error message
-      let errorMessage = 'Có lỗi xảy ra khi nộp hồ sơ. Vui lòng thử lại sau ít phút.';
+      let errorMessage = 'Có lỗi xảy ra khi nộp hồ sơ. Vui lòng thử lại.';
       
       if (error?.message) {
         if (error.message.includes('đã nộp hồ sơ')) {
           errorMessage = 'Bạn đã nộp hồ sơ cho vị trí này rồi!';
-        } else if (error.message.includes('cập nhật hệ thống')) {
-          errorMessage = 'Hệ thống đang cập nhật. Vui lòng thử lại sau 5 phút.';
-        } else if (error.message.includes('network') || error.message.includes('fetch')) {
-          errorMessage = 'Lỗi kết nối mạng. Vui lòng kiểm tra internet và thử lại.';
-        } else if (error.message.includes('Vui lòng chọn vị trí')) {
-          errorMessage = error.message;
-        } else {
-          errorMessage = 'Có lỗi xảy ra. Vui lòng thử lại sau ít phút.';
+        } else if (error.message.includes('phân quyền')) {
+          errorMessage = 'Có lỗi hệ thống. Vui lòng liên hệ HR để được hỗ trợ.';
         }
       }
       

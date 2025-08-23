@@ -21,15 +21,8 @@ export class DatabaseService {
     
     let errorMessage = `Lỗi ${operation}`;
     
-    if (error?.code === '42501' || error?.message?.includes('row-level security')) {
-      // Handle RLS errors more gracefully
-      if (operation.includes('nộp hồ sơ') || operation.includes('ứng tuyển') || operation.includes('tải danh sách vị trí')) {
-        errorMessage = 'Đang cập nhật hệ thống. Vui lòng thử lại sau ít phút.';
-      } else if (operation.includes('tải') || operation.includes('xem')) {
-        errorMessage = 'Không thể tải dữ liệu. Vui lòng đăng nhập lại.';
-      } else {
-        errorMessage = 'Lỗi phân quyền: Vui lòng đăng nhập lại với tài khoản có quyền truy cập';
-      }
+    if (error?.code === '42501' || error?.message?.includes('row-level security') || error?.message?.includes('policy')) {
+      errorMessage = 'Lỗi phân quyền: Vui lòng đăng nhập lại hoặc liên hệ quản trị viên';
     } else if (error?.code === '23505') {
       errorMessage = 'Dữ liệu đã tồn tại trong hệ thống';
     } else if (error?.code === '23503') {
@@ -294,25 +287,6 @@ export class DatabaseService {
     try {
       console.log('🔍 Looking for user with email:', email);
       
-      // For admin user, try direct database access first
-      if (email === 'admin@company.com') {
-        const { data: adminData, error: adminError } = await supabase
-          .from('users')
-          .select('*')
-          .eq('email', email)
-          .eq('role', 'ADMIN')
-          .single();
-          
-        if (adminData) {
-          console.log('✅ Admin user found directly:', adminData.full_name);
-          return adminData;
-        }
-        
-        if (adminError && adminError.code !== 'PGRST116') {
-          console.error('Error finding admin user:', adminError);
-        }
-      }
-      
       const { data, error } = await supabase
         .from('users')
         .select('*')
@@ -322,14 +296,7 @@ export class DatabaseService {
 
       if (error && error.code !== 'PGRST116') {
         console.error('Database error finding user:', error);
-        
-        // Don't throw error for user lookup, just return null
-        if (error.code === '42501') {
-          console.warn('RLS policy blocking user lookup, returning null');
-          return null;
-        }
-        
-        this.handleDatabaseError(error, 'tìm người dùng');
+        return null; // Return null instead of throwing error for user lookup
       }
       
       if (data) {
@@ -340,10 +307,8 @@ export class DatabaseService {
       
       return data;
     } catch (error) {
-      if (error instanceof Error && error.message.includes('Không tìm thấy dữ liệu')) {
-        return null;
-      }
-      this.handleDatabaseError(error, 'tìm người dùng');
+      console.error('Exception in getUserByEmail:', error);
+      return null; // Always return null for user lookup errors
     }
   }
 
@@ -356,11 +321,7 @@ export class DatabaseService {
 
       console.log('Creating candidate with data:', candidateData);
 
-      // Ensure we're using the anon key for anonymous submissions
-      const client = supabase;
-      
-      // Create candidate - explicitly allow for anonymous users
-      const { data, error } = await client
+      const { data, error } = await supabase
         .from('candidates')
         .insert(candidateData)
         .select()
@@ -368,17 +329,9 @@ export class DatabaseService {
 
       if (error) {
         console.error('Candidate creation error:', error);
-        
-        // Handle RLS errors more specifically
-        if (error.code === '42501' || error.message?.includes('row-level security')) {
-          console.error('RLS policy blocking candidate creation:', error);
-          throw new Error('Không thể nộp hồ sơ. Vui lòng liên hệ HR để được hỗ trợ.');
-        } else if (error.code === '23505') {
+        if (error.code === '23505') {
           throw new Error('Bạn đã nộp hồ sơ cho vị trí này rồi!');
-        } else if (error.code === 'PGRST301') {
-          throw new Error('Lỗi kết nối database. Vui lòng thử lại sau.');
         }
-        
         this.handleDatabaseError(error, 'nộp hồ sơ');
       }
       
@@ -751,10 +704,7 @@ export class DatabaseService {
     try {
       console.log('Fetching open positions...');
       
-      // Use anon access to fetch open positions
-      const client = supabase;
-      
-      const { data, error } = await client
+      const { data, error } = await supabase
         .from('positions')
         .select('*')
         .eq('is_open', true)
@@ -762,41 +712,6 @@ export class DatabaseService {
 
       if (error) {
         console.error('Error fetching positions:', error);
-        
-        // Return default positions if database access fails
-        if (error.code === '42501' || error.message?.includes('row-level security')) {
-          console.warn('RLS policy blocking positions access, returning defaults');
-          return [
-            {
-              id: 'default-1',
-              title: 'Frontend Developer',
-              department: 'IT',
-              description: 'Phát triển giao diện người dùng với React, Vue.js',
-              is_open: true,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            },
-            {
-              id: 'default-2', 
-              title: 'Backend Developer',
-              department: 'IT',
-              description: 'Phát triển API và hệ thống backend',
-              is_open: true,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            },
-            {
-              id: 'default-3',
-              title: 'Full Stack Developer',
-              department: 'IT',
-              description: 'Phát triển ứng dụng web full stack',
-              is_open: true,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            }
-          ];
-        }
-        
         this.handleDatabaseError(error, 'tải danh sách vị trí');
       }
       
@@ -852,20 +767,16 @@ export class DatabaseService {
     payload_json?: Record<string, any>;
   }): Promise<void> {
     try {
-      console.log('Creating audit log:', logData);
-      
       const { error } = await supabase
         .from('audit_logs')
         .insert(logData);
         
       if (error) {
-        console.warn('Error creating audit log (non-critical):', error);
+        console.warn('Audit log creation failed (non-critical):', error.message);
         // Don't throw error for audit logs, just log the warning
-      } else {
-        console.log('Audit log created successfully');
       }
     } catch (error) {
-      console.warn('Exception in createAuditLog (non-critical):', error);
+      console.warn('Audit log exception (non-critical):', error);
       // Don't throw error for audit logs
     }
   }

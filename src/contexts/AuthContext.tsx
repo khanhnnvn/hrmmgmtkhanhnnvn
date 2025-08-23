@@ -179,14 +179,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
           }
           
           // Handle specific error types for other users
-          if (error.message.includes('Failed to fetch') || error.message.includes('fetch')) {
-            toast.error('Không thể kết nối đến server. Vui lòng kiểm tra kết nối mạng và thử lại.');
-          } else if (error.message.includes('Invalid login credentials')) {
+          if (error.message.includes('Invalid login credentials')) {
             toast.error('Email hoặc mật khẩu không chính xác');
-          } else if (error.message.includes('Email not confirmed')) {
-            toast.error('Vui lòng xác nhận email trước khi đăng nhập');
           } else {
-            toast.error('Lỗi đăng nhập: ' + error.message);
+            toast.error('Email hoặc mật khẩu không chính xác');
           }
           return false;
         }
