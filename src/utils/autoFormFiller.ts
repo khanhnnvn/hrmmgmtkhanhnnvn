@@ -155,14 +155,16 @@ export const runAutoFormFiller = async (positions: Position[], candidateIndex = 
         setTimeout(() => {
           // Check if success screen is shown
           const successElement = document.querySelector('[class*="green"]') || 
-                                 document.querySelector('h2:contains("thành công")') ||
-                                 document.querySelector('button:contains("Nộp hồ sơ khác")');
+                                 Array.from(document.querySelectorAll('h2')).find(el => el.textContent?.includes('thành công')) ||
+                                 Array.from(document.querySelectorAll('button')).find(el => el.textContent?.includes('Nộp hồ sơ khác'));
           
           if (successElement) {
             console.log('Success detected, continuing with next candidate...');
             
             // Click "Nộp hồ sơ khác" button if available
-            const nextButton = document.querySelector('button:contains("Nộp hồ sơ khác")') as HTMLButtonElement;
+            const nextButton = Array.from(document.querySelectorAll('button')).find(el => 
+              el.textContent?.includes('Nộp hồ sơ khác')
+            ) as HTMLButtonElement;
             if (nextButton) {
               setTimeout(() => {
                 nextButton.click();
