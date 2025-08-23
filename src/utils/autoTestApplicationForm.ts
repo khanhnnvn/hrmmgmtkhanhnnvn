@@ -52,6 +52,7 @@ export const autoFillForm = async (candidateData: any, positions: Position[]): P
           fullNameInput.value = candidateData.full_name;
           fullNameInput.dispatchEvent(new Event('input', { bubbles: true }));
           fullNameInput.dispatchEvent(new Event('change', { bubbles: true }));
+          console.log('✅ Filled full name:', candidateData.full_name);
         }
 
         // Fill email
@@ -60,6 +61,7 @@ export const autoFillForm = async (candidateData: any, positions: Position[]): P
           emailInput.value = candidateData.email;
           emailInput.dispatchEvent(new Event('input', { bubbles: true }));
           emailInput.dispatchEvent(new Event('change', { bubbles: true }));
+          console.log('✅ Filled email:', candidateData.email);
         }
 
         // Fill phone
@@ -68,6 +70,7 @@ export const autoFillForm = async (candidateData: any, positions: Position[]): P
           phoneInput.value = candidateData.phone;
           phoneInput.dispatchEvent(new Event('input', { bubbles: true }));
           phoneInput.dispatchEvent(new Event('change', { bubbles: true }));
+          console.log('✅ Filled phone:', candidateData.phone);
         }
 
         // Select random position
@@ -76,6 +79,9 @@ export const autoFillForm = async (candidateData: any, positions: Position[]): P
           const randomPosition = positions[Math.floor(Math.random() * positions.length)];
           positionSelect.value = randomPosition.id;
           positionSelect.dispatchEvent(new Event('change', { bubbles: true }));
+          console.log('✅ Selected position:', randomPosition.title);
+        } else {
+          console.warn('⚠️ No positions available or select element not found');
         }
 
         console.log(`✅ Form filled successfully for: ${candidateData.full_name}`);

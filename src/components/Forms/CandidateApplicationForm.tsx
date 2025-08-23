@@ -1,20 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Upload, FileText, CheckCircle } from 'lucide-react';
+import { Upload, FileText, CheckCircle, Play, Bug } from 'lucide-react';
 import { candidateSchema, type CandidateFormData } from '../../utils/validation';
 import { DatabaseService } from '../../lib/database';
 import type { Position } from '../../types/database';
 import toast from 'react-hot-toast';
 
-// Auto test integration
-const isAutoTestMode = import.meta.env.DEV && window.location.search.includes('autotest=true');
+// Auto test integration - always available in dev mode
+const isDevMode = import.meta.env.DEV;
 
 export function CandidateApplicationForm() {
   const [positions, setPositions] = useState<Position[]>([]);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isAutoTestRunning, setIsAutoTestRunning] = useState(false);
 
   const {
     register,
@@ -29,10 +30,10 @@ export function CandidateApplicationForm() {
   useEffect(() => {
     loadPositions();
     
-    // Auto test integration
-    if (isAutoTestMode) {
-      console.log('🤖 Auto test mode detected on /apply page');
-      console.log('Use window.autoTest.run() to start testing');
+    // Auto test integration - always available in dev
+    if (isDevMode) {
+      console.log('🤖 Auto test available on /apply page');
+      console.log('Use the Auto Test button or window.autoTest.run() to start testing');
     }
   }, []);
 
@@ -40,8 +41,12 @@ export function CandidateApplicationForm() {
     try {
       const data = await DatabaseService.getOpenPositions();
       setPositions(data);
+      console.log('✅ Loaded positions:', data.length);
     } catch (error) {
-      // If positions fail to load, show a user-friendly message
+      console.error('❌ Error loading positions:', error);
+      // Create default positions if none exist
+      await createDefaultPositions();
+      // Show user-friendly message
       toast.error('Không thể tải danh sách vị trí. Vui lòng thử lại.');
     }
   };
@@ -81,6 +86,27 @@ export function CandidateApplicationForm() {
     }
   };
 
+  const createDefaultPositions = async () => {
+    try {
+      console.log('🔧 Creating default positions...');
+      // This would need to be implemented in DatabaseService
+      // For now, just log the attempt
+      console.log('Default positions creation attempted');
+    } catch (error) {
+      console.error('Failed to create default positions:', error);
+    }
+  };
+
+  const startAutoTest = async () => {
+    if (window.autoTest) {
+      setIsAutoTestRunning(true);
+      await window.autoTest.run();
+      setIsAutoTestRunning(false);
+    } else {
+      toast.error('Auto test system not available');
+    }
+  };
+
   const onSubmit = async (data: CandidateFormData) => {
     try {
       // Validate required fields
@@ -104,23 +130,22 @@ export function CandidateApplicationForm() {
       };
 
       await DatabaseService.createCandidate(candidateData);
+      console.log('✅ Candidate created successfully:', candidateData.full_name);
       
       setIsSubmitted(true);
       reset();
       setSelectedFile(null);
       toast.success('Nộp hồ sơ thành công! Chúng tôi sẽ liên hệ với bạn sớm nhất.');
     } catch (error: any) {
-      // Show user-friendly error message
+      console.error('❌ Error creating candidate:', error);
       let errorMessage = 'Có lỗi xảy ra khi nộp hồ sơ. Vui lòng thử lại.';
-      
-      // Log error for auto test system
-      if (isAutoTestMode) {
-        console.error('🤖 Auto test detected error:', error);
-      }
       
       if (error?.message) {
         if (error.message.includes('đã nộp hồ sơ')) {
           errorMessage = 'Bạn đã nộp hồ sơ cho vị trí này rồi!';
+        } else if (error.message.includes('row-level security')) {
+          errorMessage = 'Lỗi bảo mật hệ thống. Vui lòng thử lại sau.';
+          console.error('🔒 RLS Policy Error - need to fix database policies');
         }
       }
       
@@ -155,6 +180,32 @@ export function CandidateApplicationForm() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 py-12">
       <div className="max-w-2xl mx-auto px-4">
+        {/* Auto Test Controls - Only in Development */}
+        {isDevMode && (
+          <div className="mb-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-medium text-yellow-800">🧪 Development Mode</h3>
+                <p className="text-xs text-yellow-700 mt-1">Auto test tools available</p>
+              </div>
+              <div className="flex space-x-2">
+                <button
+                  onClick={startAutoTest}
+                  disabled={isAutoTestRunning}
+                  className="flex items-center space-x-1 px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {isAutoTestRunning ? (
+                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                  ) : (
+                    <Play className="w-3 h-3" />
+                  )}
+                  <span>{isAutoTestRunning ? 'Testing...' : 'Auto Test'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
           <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-8 py-6">
             <h1 className="text-3xl font-bold text-white">Ứng tuyển vị trí</h1>

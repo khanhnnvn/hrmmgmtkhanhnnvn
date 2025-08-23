@@ -301,10 +301,20 @@ export class DatabaseService {
   // Candidate management
   static async createCandidate(candidateData: Partial<Candidate>): Promise<Candidate> {
     try {
+      console.log('📝 Creating candidate:', candidateData.full_name);
+      
       if (!candidateData.applied_position_id) {
         throw new Error('Vui lòng chọn vị trí ứng tuyển');
       }
 
+      // Log the data being sent
+      console.log('📤 Candidate data:', {
+        full_name: candidateData.full_name,
+        email: candidateData.email,
+        phone: candidateData.phone,
+        applied_position_id: candidateData.applied_position_id,
+        status: candidateData.status
+      });
 
       const { data, error } = await supabase
         .from('candidates')
@@ -313,14 +323,18 @@ export class DatabaseService {
         .single();
 
       if (error) {
+        console.error('❌ Supabase error:', error);
         if (error.code === '23505') {
           throw new Error('Bạn đã nộp hồ sơ cho vị trí này rồi!');
         }
-        if (error.code === '42501') {
-          throw new Error('Lỗi hệ thống. Vui lòng thử lại sau ít phút.');
+        if (error.code === '42501' || error.message.includes('row-level security')) {
+          console.error('🔒 RLS Policy violation - candidates table needs policy fix');
+          throw new Error('Lỗi bảo mật hệ thống. Cần sửa RLS policy cho bảng candidates.');
         }
         this.handleDatabaseError(error, 'nộp hồ sơ');
       }
+      
+      console.log('✅ Candidate created successfully:', data.full_name);
       
       // Create audit log
       try {
@@ -330,8 +344,9 @@ export class DatabaseService {
           target_id: data.id,
           payload_json: { candidate_name: data.full_name, position_id: data.applied_position_id }
         });
+        console.log('📋 Audit log created');
       } catch (auditError) {
-        // Don't fail the candidate creation if audit log fails
+        console.warn('⚠️ Audit log failed (non-critical):', auditError);
       }
       
       return data;
@@ -686,6 +701,7 @@ export class DatabaseService {
   // Position management
   static async getOpenPositions(): Promise<Position[]> {
     try {
+      console.log('🔍 Loading open positions...');
       const { data, error } = await supabase
         .from('positions')
         .select('*')
@@ -693,9 +709,11 @@ export class DatabaseService {
         .order('title');
 
       if (error) {
+        console.error('❌ Error loading positions:', error);
         this.handleDatabaseError(error, 'tải danh sách vị trí');
       }
       
+      console.log('✅ Loaded positions:', data?.length || 0);
       return data || [];
     } catch (error) {
       this.handleDatabaseError(error, 'tải danh sách vị trí');
