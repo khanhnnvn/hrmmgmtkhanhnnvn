@@ -22,7 +22,12 @@ export class DatabaseService {
     let errorMessage = `Lỗi ${operation}`;
     
     if (error?.code === '42501' || error?.message?.includes('row-level security')) {
-      errorMessage = 'Lỗi phân quyền: Vui lòng đăng nhập lại với tài khoản có quyền truy cập';
+      // Different messages for different operations
+      if (operation.includes('nộp hồ sơ') || operation.includes('ứng tuyển')) {
+        errorMessage = 'Không thể nộp hồ sơ. Vui lòng kiểm tra thông tin và thử lại.';
+      } else {
+        errorMessage = 'Lỗi phân quyền: Vui lòng đăng nhập lại với tài khoản có quyền truy cập';
+      }
     } else if (error?.code === '23505') {
       errorMessage = 'Dữ liệu đã tồn tại trong hệ thống';
     } else if (error?.code === '23503') {
@@ -322,6 +327,7 @@ export class DatabaseService {
 
       console.log('Creating candidate with data:', candidateData);
 
+      // For anonymous submissions, use anon client
       const { data, error } = await supabase
         .from('candidates')
         .insert(candidateData)
@@ -329,6 +335,13 @@ export class DatabaseService {
         .single();
 
       if (error) {
+        console.error('Candidate creation error:', error);
+        
+        // Handle specific RLS errors for anonymous users
+        if (error.code === '42501' && error.message.includes('row-level security')) {
+          throw new Error('Không thể nộp hồ sơ. Vui lòng thử lại sau hoặc liên hệ HR.');
+        }
+        
         this.handleDatabaseError(error, 'nộp hồ sơ');
       }
       
@@ -344,6 +357,7 @@ export class DatabaseService {
         });
       } catch (auditError) {
         console.warn('Failed to create audit log:', auditError);
+        // Don't fail the candidate creation if audit log fails
       }
       
       return data;
@@ -700,6 +714,7 @@ export class DatabaseService {
     try {
       console.log('Fetching open positions...');
       
+      // Use public access for positions (no auth required)
       const { data, error } = await supabase
         .from('positions')
         .select('*')
@@ -707,6 +722,14 @@ export class DatabaseService {
         .order('title');
 
       if (error) {
+        console.error('Error fetching positions:', error);
+        
+        // Handle RLS errors gracefully
+        if (error.code === '42501') {
+          console.warn('RLS policy issue for positions, returning empty array');
+          return [];
+        }
+        
         this.handleDatabaseError(error, 'tải danh sách vị trí');
       }
       
