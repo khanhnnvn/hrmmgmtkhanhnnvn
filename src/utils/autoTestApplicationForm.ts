@@ -122,9 +122,9 @@ export const checkFormResult = async (): Promise<{ success: boolean; error?: str
     setTimeout(() => {
       // Check for success message
       const successElements = [
-        document.querySelector('h2:contains("thành công")'),
+        Array.from(document.querySelectorAll('h2')).find(el => el.textContent?.includes('thành công')),
         document.querySelector('[class*="green"]'),
-        document.querySelector('button:contains("Nộp hồ sơ khác")'),
+        Array.from(document.querySelectorAll('button')).find(el => el.textContent?.includes('Nộp hồ sơ khác')),
         document.querySelector('[class*="CheckCircle"]')
       ].filter(Boolean);
 
