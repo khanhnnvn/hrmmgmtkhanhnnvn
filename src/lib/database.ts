@@ -316,6 +316,9 @@ export class DatabaseService {
         if (error.code === '23505') {
           throw new Error('Bạn đã nộp hồ sơ cho vị trí này rồi!');
         }
+        if (error.code === '42501') {
+          throw new Error('Lỗi hệ thống. Vui lòng thử lại sau ít phút.');
+        }
         this.handleDatabaseError(error, 'nộp hồ sơ');
       }
       
@@ -333,7 +336,10 @@ export class DatabaseService {
       
       return data;
     } catch (error) {
-      this.handleDatabaseError(error, 'nộp hồ sơ');
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error('Có lỗi xảy ra khi nộp hồ sơ. Vui lòng thử lại.');
     }
   }
 
