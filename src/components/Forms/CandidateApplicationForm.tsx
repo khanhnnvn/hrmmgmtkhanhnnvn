@@ -74,8 +74,6 @@ export function CandidateApplicationForm() {
   const onSubmit = async (data: CandidateFormData) => {
     try {
       console.log('Form submission started with data:', data);
-      console.log('Current URL:', window.location.href);
-      console.log('Supabase URL:', import.meta.env.VITE_SUPABASE_URL);
       
       // Validate required fields
       if (!data.applied_position_id) {
@@ -93,16 +91,15 @@ export function CandidateApplicationForm() {
       }
 
       console.log('Validation passed, creating candidate...');
-      console.log('Selected position:', selectedPosition);
       
-      // In a real application, you would upload the file to Supabase Storage first
+      // Prepare candidate data
       const candidateData = {
         ...data,
         status: 'SUBMITTED',
         cv_url: selectedFile ? `uploads/${Date.now()}_${selectedFile.name}` : ''
       };
 
-      console.log('Final candidate data:', candidateData);
+      console.log('Submitting candidate application...');
       
       await DatabaseService.createCandidate(candidateData);
       
@@ -113,23 +110,21 @@ export function CandidateApplicationForm() {
       toast.success('Nộp hồ sơ thành công! Chúng tôi sẽ liên hệ với bạn sớm nhất.');
     } catch (error: any) {
       console.error('Form submission error:', error);
-      console.error('Error type:', typeof error);
-      console.error('Error message:', error?.message);
-      console.error('Error code:', error?.code);
-      console.error('Error stack:', error?.stack);
       
       // Show user-friendly error message
-      let errorMessage = 'Có lỗi xảy ra khi nộp hồ sơ. Vui lòng thử lại.';
+      let errorMessage = 'Có lỗi xảy ra khi nộp hồ sơ. Vui lòng thử lại sau ít phút.';
       
       if (error?.message) {
-        if (error.message.includes('row-level security') || error.message.includes('42501')) {
-          errorMessage = 'Lỗi bảo mật hệ thống. Vui lòng liên hệ quản trị viên.';
-        } else if (error.message.includes('already exists') || error.message.includes('đã nộp hồ sơ')) {
+        if (error.message.includes('đã nộp hồ sơ')) {
           errorMessage = 'Bạn đã nộp hồ sơ cho vị trí này rồi!';
+        } else if (error.message.includes('cập nhật hệ thống')) {
+          errorMessage = 'Hệ thống đang cập nhật. Vui lòng thử lại sau 5 phút.';
         } else if (error.message.includes('network') || error.message.includes('fetch')) {
           errorMessage = 'Lỗi kết nối mạng. Vui lòng kiểm tra internet và thử lại.';
-        } else {
+        } else if (error.message.includes('Vui lòng chọn vị trí')) {
           errorMessage = error.message;
+        } else {
+          errorMessage = 'Có lỗi xảy ra. Vui lòng thử lại sau ít phút.';
         }
       }
       

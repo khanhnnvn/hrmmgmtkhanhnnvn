@@ -22,8 +22,9 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true,
     detectSessionInUrl: false,
     flowType: 'implicit',
-    // Disable email confirmation for development
-    confirmationUrl: undefined
+    confirmationUrl: undefined,
+    // Allow anonymous access
+    autoRefreshToken: false
   },
   db: {
     schema: 'public'
@@ -31,6 +32,8 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   global: {
     headers: {
       'X-Client-Info': 'recruitment-system@1.0.0',
+      'apikey': supabaseAnonKey,
+      'Authorization': `Bearer ${supabaseAnonKey}`
     }
   },
   realtime: {
@@ -55,7 +58,7 @@ export const checkEmailConfirmationStatus = async () => {
 // Test connection
 supabase.auth.getSession().then(({ data, error }) => {
   if (error) {
-    console.error('Supabase connection error:', error);
+    console.warn('Supabase auth session error (may be normal for anonymous access):', error);
   } else {
     console.log('✅ Supabase connected successfully');
   }
