@@ -279,7 +279,9 @@ export const runAutoTest = async (): Promise<void> => {
           console.log('✅ Test passed');
           
           // Click "Nộp hồ sơ khác" if available to reset form
-          const nextButton = document.querySelector('button:contains("Nộp hồ sơ khác")') as HTMLButtonElement;
+          const nextButton = Array.from(document.querySelectorAll('button')).find(el => 
+            el.textContent?.includes('Nộp hồ sơ khác')
+          ) as HTMLButtonElement;
           if (nextButton) {
             setTimeout(() => nextButton.click(), 1000);
           }
