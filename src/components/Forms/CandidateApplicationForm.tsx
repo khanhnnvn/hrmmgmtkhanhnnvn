@@ -7,6 +7,9 @@ import { DatabaseService } from '../../lib/database';
 import type { Position } from '../../types/database';
 import toast from 'react-hot-toast';
 
+// Auto test integration
+const isAutoTestMode = import.meta.env.DEV && window.location.search.includes('autotest=true');
+
 export function CandidateApplicationForm() {
   const [positions, setPositions] = useState<Position[]>([]);
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -25,6 +28,12 @@ export function CandidateApplicationForm() {
 
   useEffect(() => {
     loadPositions();
+    
+    // Auto test integration
+    if (isAutoTestMode) {
+      console.log('🤖 Auto test mode detected on /apply page');
+      console.log('Use window.autoTest.run() to start testing');
+    }
   }, []);
 
   const loadPositions = async () => {
@@ -103,6 +112,11 @@ export function CandidateApplicationForm() {
     } catch (error: any) {
       // Show user-friendly error message
       let errorMessage = 'Có lỗi xảy ra khi nộp hồ sơ. Vui lòng thử lại.';
+      
+      // Log error for auto test system
+      if (isAutoTestMode) {
+        console.error('🤖 Auto test detected error:', error);
+      }
       
       if (error?.message) {
         if (error.message.includes('đã nộp hồ sơ')) {
